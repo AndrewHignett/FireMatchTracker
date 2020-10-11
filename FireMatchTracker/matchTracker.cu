@@ -3,6 +3,10 @@
 
 #include <stdio.h>
 
+#include <opencv2/core.hpp>
+using namespace cv;
+#include <opencv2/cudaarithm.hpp>
+using namespace cv::cuda;
 
 __global__ void trackKernel(int *c, const int *a, const int *b)
 {
