@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#include <iostream>
+using namespace std;
 #include <opencv2/core.hpp>
 using namespace cv;
 #include <opencv2/cudaarithm.hpp>
@@ -20,6 +22,12 @@ __global__ void trackKernel(int *c, const int *a, const int *b)
 
 int main()
 {
-
-    return 0;
+	//test code from Get started with OpenCV CUDA cpp
+	printShortCudaDeviceInfo(getDevice());
+	int cuda_devices_number = getCudaEnabledDeviceCount();
+	cout << "CUDA Device(s) Number: " << cuda_devices_number << endl;
+	DeviceInfo _deviceInfo;
+	bool _isd_evice_compatible = _deviceInfo.isCompatible();
+	cout << "CUDA Device(s) Compatible: " << _isd_evice_compatible << endl;
+	return 0;
 }
