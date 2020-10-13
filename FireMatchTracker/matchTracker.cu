@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 
+//#include <opencv2/cudev/ptr2d/gpumat.hpp>
+//Canny and Gaussian
+#include <opencv2/cudaimgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 #include <iostream>
@@ -32,34 +35,64 @@ int main()
 	bool _isd_evice_compatible = _deviceInfo.isCompatible();
 	cout << "CUDA Device(s) Compatible: " << _isd_evice_compatible << endl;
 
-	Mat frame;
-	VideoCapture cam;// = VideoCapture(0, CAP_DSHOW);
-	cam.open(0);// CAP_DSHOW);
-	if (!cam.isOpened()) {
-		cerr << "ERROR Unable to open camera\n";
-		return -1;
-	}
+	//Mat frame;
+	//VideoCapture cam;// = VideoCapture(0, CAP_DSHOW);
+	//cam.open(0);// CAP_DSHOW);
+	//if (!cam.isOpened()) {
+	//	cerr << "ERROR Unable to open camera\n";
+	//	return -1;
+	//}
 	//cam.read(frame);
 	//if (frame.empty()) {
 	//	cerr << "ERROR Blank frame\n";
 	//	return -1;
 	//}
-	destroyAllWindows();
+	//destroyAllWindows();
 
 
 	//working code that opens and displays the webcam
+	/*
 	VideoCapture cap(0);
+	//cap.open(device);
+	//cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC(eMf, eJf, ePf, eGf));
+	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
+	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
+	int frameN = 0;
 	while (1)
 	{
-		Mat image;
-		cap >> image;
-		if (!image.data) break;
-		if (waitKey(30) >= 0) break;
+		Mat frame;
+		cap >> frame;
+		if (!frame.data) break;
+		//if (waitKey(30) >= 0) break;
 
-		imshow("test", image);
+		imshow("Camera", frame);
+		if (frameN%30 == 0){
+			printf("%d\n", frameN);
+		}
+		frameN++;
 		waitKey(1);
-	}
+	}*/
+	
+	VideoCapture cap(0); // open the default camera
+	if (!cap.isOpened())  // check if we succeeded
+		return -1;
 
+	Mat edges;
+	//namedWindow("edges", 1);
+	for (;;)
+	{
+		Mat frame;
+		cap >> frame; // get a new frame from camera
+		//cv::cuda::cvtColor(frame, edges, CV_BGR2GRAY);
+		//GaussianBlur(edges, edges, Size(7, 7), 1.5, 1.5);
+		//Canny(edges, edges, 0, 30, 3);
+		//imshow("edges", edges);
+		//if (waitKey(30) >= 0) break;
+		//waitKey(1);
+	}
+	// the camera will be deinitialized automatically in VideoCapture destructor
+	//return 0;
+	
 
 	//Old basic CUDA code sample
 	//--- INITIALIZE VIDEOCAPTURE
