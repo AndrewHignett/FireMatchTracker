@@ -57,6 +57,7 @@ int main() {
 		waitKey(1);
 	}*/
 
+
 	VideoCapture cap(0); // open the default camera
 	if (!cap.isOpened())  // check if we succeeded
 		return -1;
@@ -68,9 +69,11 @@ int main() {
 		Mat frame;
 		cap >> frame; // get a new frame from camera
 		//cv::cuda::cvtColor(frame, edges, CV_BGR2GRAY);
+		//cv::cvtColor(frame, edges, CV_BGR2GRAY);
 		//GaussianBlur(edges, edges, Size(7, 7), 1.5, 1.5);
 		//Canny(edges, edges, 0, 30, 3);
 		//imshow("edges", edges);
+		//imshow("edges", frame);
 		//if (waitKey(30) >= 0) break;
 		//waitKey(1);
 	}
