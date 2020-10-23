@@ -19,101 +19,28 @@ int main() {
 	bool _isd_evice_compatible = _deviceInfo.isCompatible();
 	cout << "CUDA Device(s) Compatible: " << _isd_evice_compatible << endl;
 
-	//Mat frame;
-	//VideoCapture cam;// = VideoCapture(0, CAP_DSHOW);
-	//cam.open(0);// CAP_DSHOW);
-	//if (!cam.isOpened()) {
-	//	cerr << "ERROR Unable to open camera\n";
-	//	return -1;
-	//}
-	//cam.read(frame);
-	//if (frame.empty()) {
-	//	cerr << "ERROR Blank frame\n";
-	//	return -1;
-	//}
-	//destroyAllWindows();
-
-
-	//working code that opens and displays the webcam
-	/*
-	VideoCapture cap(0);
-	//cap.open(device);
-	//cap.set(CV_CAP_PROP_FOURCC, CV_FOURCC(eMf, eJf, ePf, eGf));
-	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
-	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
-	int frameN = 0;
-	while (1)
-	{
-		Mat frame;
-		cap >> frame;
-		if (!frame.data) break;
-		//if (waitKey(30) >= 0) break;
-
-		imshow("Camera", frame);
-		if (frameN%30 == 0){
-			printf("%d\n", frameN);
-		}
-		frameN++;
-		waitKey(1);
-	}*/
-
-
 	VideoCapture cap(0); // open the default camera
 	if (!cap.isOpened())  // check if we succeeded
 		return -1;
+	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
+	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
 
-	Mat edges;
-	//namedWindow("edges", 1);
+	cv::cuda::GpuMat edges;
+	namedWindow("frame", 1);
 	for (;;)
 	{
 		Mat frame;
 		cap >> frame; // get a new frame from camera
-		//cv::cuda::cvtColor(frame, edges, CV_BGR2GRAY);
-		//cv::cvtColor(frame, edges, CV_BGR2GRAY);
-		//GaussianBlur(edges, edges, Size(7, 7), 1.5, 1.5);
-		//Canny(edges, edges, 0, 30, 3);
-		//imshow("edges", edges);
-		//imshow("edges", frame);
-		//if (waitKey(30) >= 0) break;
-		//waitKey(1);
+		cv::cuda::GpuMat imageGpu;
+		imageGpu.upload(frame); //convert captured frame to gpu
+		cv::cuda::cvtColor(imageGpu, edges, CV_BGR2GRAY); 
+		edges.download(frame); //convert edges from gpu to host
+		GaussianBlur(frame, frame, Size(7, 7), 1.5, 1.5);
+		Canny(frame, frame, 0, 30, 3);
+		imshow("frame", frame);
+		if (waitKey(30) >= 0) break;
+		waitKey(1);
 	}
-	// the camera will be deinitialized automatically in VideoCapture destructor
-	//return 0;
-
-
-	//Old basic CUDA code sample
-	//--- INITIALIZE VIDEOCAPTURE
-	//VideoCapture cap;
-	// open the default camera using default API
-	// cap.open(0);
-	// OR advance usage: select any API backend
-	//int deviceID = 0;             // 0 = open default camera
-	//int apiID = cv::CAP_ANY;      // 0 = autodetect default API
-	// open selected camera using selected API
-	//cap.open(deviceID, apiID);
-	// check if we succeeded
-	/*if (!cap.isOpened()) {
-		cerr << "ERROR! Unable to open camera\n";
-		return -1;
-	}
-
-	//--- GRAB AND WRITE LOOP
-	cout << "Start grabbing" << endl
-		<< "Press any key to terminate" << endl;
-	for (;;)
-	{
-		// wait for a new frame from camera and store it into 'frame'
-		cap.read(frame);
-		// check if we succeeded
-		if (frame.empty()) {
-			cerr << "ERROR! blank frame grabbed\n";
-			break;
-		}
-		// show live and wait for a key with timeout long enough to show images
-		imshow("Live", frame);
-		if (waitKey(5) >= 0)
-			break;
-	}*/
-
+	destroyAllWindows();
 	return 0;
 }
