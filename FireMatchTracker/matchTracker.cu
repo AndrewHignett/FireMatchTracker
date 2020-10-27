@@ -12,6 +12,9 @@ __global__ void trackKernel(int *c, const int *a, const int *b)
 	//move particles with physics based on the match's movement
 }
 
-void track() {
+void track(Mat frame) {
+	Vec3b pixel = frame.at<Vec3b>(0, 0);
+	//BGR pixel values
+	printf("%d %d %d\n", pixel[0], pixel[1], pixel[2]);
 	//trackKernel<<<, >>>();
 }

@@ -4,8 +4,6 @@
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
 using namespace std;
-#include <opencv2/core.hpp>
-using namespace cv;
 #include <opencv2/cudaarithm.hpp>
 using namespace cv::cuda;
 #include "matchTracker.h"
@@ -31,13 +29,15 @@ int main() {
 	{
 		Mat frame;
 		cap >> frame; // get a new frame from camera
-		cv::cuda::GpuMat imageGpu;
-		imageGpu.upload(frame); //convert captured frame to gpu
-		cv::cuda::cvtColor(imageGpu, edges, CV_BGR2GRAY); 
-		edges.download(frame); //convert edges from gpu to host
-		GaussianBlur(frame, frame, Size(7, 7), 1.5, 1.5);
-		Canny(frame, frame, 0, 30, 3);
+		//cv::cuda::GpuMat imageGpu;
+		//imageGpu.upload(frame); //convert captured frame to gpu
+		//cv::cuda::cvtColor(imageGpu, edges, CV_BGR2GRAY); 
+		//edges.download(frame); //convert edges from gpu to host
+		//GaussianBlur(frame, frame, Size(7, 7), 1.5, 1.5);
+		//Canny(frame, frame, 0, 30, 3);
 		imshow("frame", frame);
+		//Type is CV_U8 = unsigned char
+		track(frame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 	}
