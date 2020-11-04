@@ -3,5 +3,5 @@ using namespace cv;
 #pragma once
 #ifndef _matchTracker_
 #define _matchTracker_
-void track(Mat frame);
+Mat track(Mat frame);
 #endif

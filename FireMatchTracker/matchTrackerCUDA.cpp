@@ -37,7 +37,7 @@ int main() {
 		//Canny(frame, frame, 0, 30, 3);
 		imshow("frame", frame);
 		//Type is CV_U8 = unsigned char
-		track(frame);
+		Mat outFrame = track(frame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 	}
