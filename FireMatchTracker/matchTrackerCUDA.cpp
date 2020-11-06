@@ -35,9 +35,10 @@ int main() {
 		//edges.download(frame); //convert edges from gpu to host
 		//GaussianBlur(frame, frame, Size(7, 7), 1.5, 1.5);
 		//Canny(frame, frame, 0, 30, 3);
-		imshow("frame", frame);
+		//imshow("frame", frame);
 		//Type is CV_U8 = unsigned char
 		Mat outFrame = track(frame);
+		imshow("frame", outFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 	}

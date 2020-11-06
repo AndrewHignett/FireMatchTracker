@@ -24,6 +24,21 @@ __global__ void trackKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat frame)
 		uint8_t pixelB = frame.data[(row*frame.step) + column * 3];
 		uint8_t pixelG = frame.data[(row*frame.step) + column * 3 + 1];
 		uint8_t pixelR = frame.data[(row*frame.step) + column * 3 + 2];
+		//out.data[(row*out.step) + column * 3] = pixelB;
+		//out.data[(row*out.step) + column * 3 + 1] = pixelG;
+		//out.data[(row*out.step) + column * 3 + 2] = pixelR;
+		if ((pixelR > 128) && (pixelB < 50) && (pixelG < 50))
+		{
+			out.data[(row*out.step) + column * 3] = pixelB;
+			out.data[(row*out.step) + column * 3 + 1] = pixelG;
+			out.data[(row*out.step) + column * 3 + 2] = pixelR;
+		}
+		else
+		{
+			out.data[(row*out.step) + column * 3] = 0;
+			out.data[(row*out.step) + column * 3 + 1] = 0;
+			out.data[(row*out.step) + column * 3 + 2] = 0;
+		}
 	}
 }
 
@@ -41,13 +56,17 @@ Mat track(Mat frame) {
 	//Set up device variables
 	//Mat *d_newFrame;
 	//Mat *d_outFrame;
-	uint8_t *imgPtr;
+	uint8_t *d_imgPtr;
+	uint8_t *d_outPtr;
 	cv::cuda::GpuMat d_newFrame;
 	cv::cuda::GpuMat d_outFrame;
 	d_newFrame.upload(frame);
+	d_outFrame.upload(frame);
 	//Allocate device memory
-	cudaMalloc((void **)&imgPtr, d_newFrame.rows*d_newFrame.step);
-	cudaMemcpyAsync(imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
+	cudaMalloc((void **)&d_imgPtr, d_newFrame.rows*d_newFrame.step);
+	cudaMalloc((void **)&d_outPtr, d_outFrame.rows*d_outFrame.step);
+	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
+	cudaMemcpyAsync(d_outPtr, d_outFrame.ptr<uint8_t>(), d_outFrame.rows*d_outFrame.step, cudaMemcpyDeviceToDevice);
 	//cudaMalloc((void**)&d_newFrame, sizeof(frame));
 	//cudaMalloc((void**)&d_outFrame, sizeof(frame));
 	//transfer memory from host to device memory
@@ -58,9 +77,12 @@ Mat track(Mat frame) {
 	//free(newFrame);
 	//cudaMemcpy(outFrame, d_outFrame, sizeof(frame), cudaMemcpyDeviceToHost);
 	//Free outFrame device memory
-	cudaFree(imgPtr);
+	cudaFree(d_imgPtr);
+	cudaFree(d_outPtr);
 	
-
+	Mat outFrame;
+	d_outFrame.download(outFrame);
+	return outFrame;
 	//return *outFrame;
 	//For the sake of debugging 
 	return frame;
