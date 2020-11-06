@@ -18,15 +18,12 @@ __global__ void trackKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat frame)
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < X * Y)
 	{
-		//int row = threadId % X;
-		//int column = threadId % Y;
 		int row = threadId / X;
 		int column = threadId % X;
 		//BGR pixel values
-		//Vec3b pixel = frame.at<Vec3b>(thisX, thisY);
-		int pixelB = frame.data[(row)];
-		//uint8_t pixelG = frame.data[(row*frame.step) + column * frame.channels() + 1];
-		//uint8_t pixelR = frame.data[(row*frame.step) + column * frame.channels() + 2];
+		uint8_t pixelB = frame.data[(row*frame.step) + column * 3];
+		uint8_t pixelG = frame.data[(row*frame.step) + column * 3 + 1];
+		uint8_t pixelR = frame.data[(row*frame.step) + column * 3 + 2];
 	}
 }
 
@@ -44,10 +41,13 @@ Mat track(Mat frame) {
 	//Set up device variables
 	//Mat *d_newFrame;
 	//Mat *d_outFrame;
+	uint8_t *imgPtr;
 	cv::cuda::GpuMat d_newFrame;
 	cv::cuda::GpuMat d_outFrame;
 	d_newFrame.upload(frame);
 	//Allocate device memory
+	cudaMalloc((void **)&imgPtr, d_newFrame.rows*d_newFrame.step);
+	cudaMemcpyAsync(imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
 	//cudaMalloc((void**)&d_newFrame, sizeof(frame));
 	//cudaMalloc((void**)&d_outFrame, sizeof(frame));
 	//transfer memory from host to device memory
@@ -58,7 +58,7 @@ Mat track(Mat frame) {
 	//free(newFrame);
 	//cudaMemcpy(outFrame, d_outFrame, sizeof(frame), cudaMemcpyDeviceToHost);
 	//Free outFrame device memory
-	//cudaFree(d_outFrame);
+	cudaFree(imgPtr);
 	
 
 	//return *outFrame;
