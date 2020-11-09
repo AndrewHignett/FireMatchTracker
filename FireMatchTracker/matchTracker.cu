@@ -15,6 +15,35 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat cleanF
 	//detect object size here
 }
 
+__global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
+{
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < X * Y)
+	{
+		int row = threadId / X;
+		int column = threadId % X;
+		uint8_t pixelR = dilatedFrame.data[(row*dilatedFrame.step) + column * 3 + 2];
+
+		if (pixelR == 255)
+		{
+			for (int i = -6; i < 7; i++)
+			{
+				for (int j = -6; j < 7; j++)
+				{
+					if (!(i == 0 && j == 0))
+					{
+						if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
+						{
+							//printf("%d %d\n", row + i, column + j);
+							//out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 255;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -22,12 +51,25 @@ __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 	{
 		int row = threadId / X;
 		int column = threadId % X;
-		uint8_t pixelB = redFrame.data[(row*redFrame.step) + column * 3];
-		uint8_t pixelG = redFrame.data[(row*redFrame.step) + column * 3 + 1];
 		uint8_t pixelR = redFrame.data[(row*redFrame.step) + column * 3 + 2];
-		out.data[(row*out.step) + column * 3] = pixelB;
-		out.data[(row*out.step) + column * 3 + 1] = pixelG;
-		out.data[(row*out.step) + column * 3 + 2] = pixelR;
+
+		if (pixelR == 255)
+		{
+			for (int i = -6; i < 7; i++)
+			{
+				for (int j = -6; j < 7; j++)
+				{
+					if (!(i == 0 && j == 0))
+					{
+						if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
+						{
+							//printf("%d %d\n", row + i, column + j);
+							out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 255;
+						}
+					}
+				}
+			}
+		}		
 	}
 }
 
@@ -120,10 +162,14 @@ Mat track(Mat frame) {
 	//Free original frame pointer device memory
 	cudaFree(d_imgPtr);
 	d_newFrame.release();
+	
 
 	uint8_t *d_dilatedPtr;
 	cv::cuda::GpuMat d_dilatedFrame;
-	d_dilatedFrame.upload(frame);
+	d_outFrame.copyTo(d_dilatedFrame);
+	
+
+	
 	//Allocate new device memory
 	cudaMalloc((void**)&d_dilatedPtr, d_dilatedFrame.rows*d_dilatedFrame.step);
 	cudaMemcpyAsync(d_dilatedPtr, d_dilatedFrame.ptr<uint8_t>(), d_dilatedFrame.rows*d_dilatedFrame.step, cudaMemcpyDeviceToDevice);
@@ -133,12 +179,28 @@ Mat track(Mat frame) {
 	//Free outFrame pointer device memory
 	cudaFree(d_outPtr);
 	d_outFrame.release();
+
+	uint8_t *d_erodedPtr;
+	cv::cuda::GpuMat d_erodedFrame;
+	d_dilatedFrame.copyTo(d_erodedFrame);
+
+	//Allocated new device memory
+	cudaMalloc((void**)&d_erodedPtr, d_erodedFrame.rows*d_erodedFrame.step);
+	cudaMemcpyAsync(d_erodedPtr, d_erodedFrame.ptr<uint8_t>(), d_erodedFrame.rows*d_erodedFrame.step, cudaMemcpyDeviceToDevice);
+
+	erodeKernel<<<blocks, threadCount>>>(d_erodedFrame, d_dilatedFrame);
 	
-	Mat outFrame;
-	d_dilatedFrame.download(outFrame);
 	//Free dilatedFrame pointer device memory
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
+
+	Mat outFrame;
+	d_erodedFrame.download(outFrame);
+	
+	//Free dilatedFrame pointer device memory
+	cudaFree(d_erodedPtr);
+	d_erodedFrame.release();
+	
 	return outFrame;
 	//return *outFrame;
 	//For the sake of debugging 
