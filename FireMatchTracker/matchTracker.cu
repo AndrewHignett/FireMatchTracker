@@ -26,19 +26,31 @@ __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
 
 		if (pixelR == 255)
 		{
-			for (int i = -6; i < 7; i++)
+			bool allPixelsRed = true;
+			for (int i = -3; i < 4; i++)
 			{
-				for (int j = -6; j < 7; j++)
+				for (int j = -3; j < 4; j++)
 				{
-					if (!(i == 0 && j == 0))
+					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 					{
-						if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
+						if (dilatedFrame.data[((row + i)*dilatedFrame.step) + (column + j) * 3 + 2] == 0)
 						{
-							//printf("%d %d\n", row + i, column + j);
-							//out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 255;
+							allPixelsRed = false;
+						}
+						else
+						{
+							//out.data[((row + i)*out.step) + (column + j) * 3] = 255;
+							//out.data[((row + i)*out.step) + (column + j) * 3 + 1] = 0;
+							//out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 0;
 						}
 					}
 				}
+			}
+			if (allPixelsRed)
+			{
+				out.data[(row*out.step) + column * 3] = 0;
+				out.data[(row*out.step) + column * 3 + 1] = 255;
+				out.data[(row*out.step) + column * 3 + 2] = 0;
 			}
 		}
 	}
