@@ -8,6 +8,14 @@ using namespace std;
 using namespace cv::cuda;
 #include "matchTracker.h"
 
+void updateBuffer(Mat *buffer, Mat newFrame) {
+
+}
+
+Mat averageFrames(Mat *buffer) {
+
+}
+
 int main() {
 	//test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
@@ -23,7 +31,7 @@ int main() {
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
 
-	cv::cuda::GpuMat edges;
+	Mat *frameBuffer = new Mat[4];
 	namedWindow("frame", 1);
 	for (;;)
 	{
@@ -38,6 +46,7 @@ int main() {
 		//imshow("frame", frame);
 		//Type is CV_U8 = unsigned char
 		Mat outFrame = track(frame);
+		updateBuffer(frameBuffer, outFrame);
 		imshow("frame", outFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);

@@ -27,21 +27,15 @@ __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
 		if (pixelR == 255)
 		{
 			bool allPixelsRed = true;
-			for (int i = -3; i < 4; i++)
+			for (int i = -8; i < 9; i++)
 			{
-				for (int j = -3; j < 4; j++)
+				for (int j = -8; j < 9; j++)
 				{
 					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 					{
 						if (dilatedFrame.data[((row + i)*dilatedFrame.step) + (column + j) * 3 + 2] == 0)
 						{
 							allPixelsRed = false;
-						}
-						else
-						{
-							//out.data[((row + i)*out.step) + (column + j) * 3] = 255;
-							//out.data[((row + i)*out.step) + (column + j) * 3 + 1] = 0;
-							//out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 0;
 						}
 					}
 				}
@@ -67,15 +61,14 @@ __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 
 		if (pixelR == 255)
 		{
-			for (int i = -6; i < 7; i++)
+			for (int i = -8; i < 9; i++)
 			{
-				for (int j = -6; j < 7; j++)
+				for (int j = -8; j < 9; j++)
 				{
 					if (!(i == 0 && j == 0))
 					{
 						if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 						{
-							//printf("%d %d\n", row + i, column + j);
 							out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 255;
 						}
 					}
@@ -127,6 +120,19 @@ __global__ void getRedKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat frame)
 			out.data[(row*out.step) + column * 3 + 1] = 0;
 			out.data[(row*out.step) + column * 3 + 2] = 0;
 		}
+	}
+}
+
+__global__ void blackKernel(cv::cuda::GpuMat out)
+{
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < X * Y)
+	{
+		int row = threadId / X;
+		int column = threadId % X;
+		out.data[(row*out.step) + column * 3] = 0;
+		out.data[(row*out.step) + column * 3 + 1] = 0;
+		out.data[(row*out.step) + column * 3 + 2] = 0;
 	}
 }
 
@@ -200,6 +206,9 @@ Mat track(Mat frame) {
 	cudaMalloc((void**)&d_erodedPtr, d_erodedFrame.rows*d_erodedFrame.step);
 	cudaMemcpyAsync(d_erodedPtr, d_erodedFrame.ptr<uint8_t>(), d_erodedFrame.rows*d_erodedFrame.step, cudaMemcpyDeviceToDevice);
 
+	//convert the frame to be completely black to avoid weird artifacts
+	blackKernel<<<blocks, threadCount>>>(d_erodedFrame);
+	
 	erodeKernel<<<blocks, threadCount>>>(d_erodedFrame, d_dilatedFrame);
 	
 	//Free dilatedFrame pointer device memory
