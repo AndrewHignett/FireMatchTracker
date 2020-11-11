@@ -4,4 +4,5 @@ using namespace cv;
 #ifndef _matchTracker_
 #define _matchTracker_
 Mat track(Mat frame);
+Mat averageFrame(Mat buffer[3]);
 #endif

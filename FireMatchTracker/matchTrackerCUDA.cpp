@@ -8,12 +8,20 @@ using namespace std;
 using namespace cv::cuda;
 #include "matchTracker.h"
 
-void updateBuffer(Mat *buffer, Mat newFrame) {
-
-}
-
-Mat averageFrames(Mat *buffer) {
-
+void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
+	if (currentSize >= 3) {
+		Mat temp1, temp2;
+		buffer[2].copyTo(temp1);
+		newFrame.copyTo(buffer[2]);
+		buffer[1].copyTo(temp2);
+		temp1.copyTo(buffer[1]);
+		temp2.copyTo(buffer[0]);
+	}
+	else {
+		printf("%d\n", currentSize);
+		buffer[currentSize] = newFrame;
+	}
+	
 }
 
 int main() {
@@ -31,7 +39,8 @@ int main() {
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
 
-	Mat *frameBuffer = new Mat[4];
+	int bufferedFrameCount = 0;
+	Mat *frameBuffer = new Mat[3];
 	namedWindow("frame", 1);
 	for (;;)
 	{
@@ -45,8 +54,12 @@ int main() {
 		//Canny(frame, frame, 0, 30, 3);
 		//imshow("frame", frame);
 		//Type is CV_U8 = unsigned char
+
+		//return initial frame image as well as tracking overlay
 		Mat outFrame = track(frame);
-		updateBuffer(frameBuffer, outFrame);
+		updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
+		bufferedFrameCount++;	
+		averageFrame(frameBuffer).copyTo(outFrame);
 		imshow("frame", outFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);

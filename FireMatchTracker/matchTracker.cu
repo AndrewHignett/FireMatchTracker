@@ -10,6 +10,31 @@ using namespace cv::cuda;
 #define X 1280
 #define Y 720
 
+__global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat bufferFrames[3])
+{
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < X * Y)
+	{
+		int row = threadId / X;
+		int column = threadId % X;
+		bool colour = false;
+		for (int i = 0; i < 3; i++) {
+
+			if (bufferFrames[i].data[(row*bufferFrames[i].step) + column * 3 + 1] > 0) {
+				colour = true;
+			}
+		}
+		
+
+		if (colour)
+		{
+			out.data[(row*out.step) + column * 3] = 0;
+			out.data[(row*out.step) + column * 3 + 1] = 0;
+			out.data[(row*out.step) + column * 3 + 2] = 255;
+		}
+	}
+}
+
 __global__ void detectObjectKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat cleanFrame)
 {
 	//detect object size here
@@ -27,8 +52,10 @@ __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
 		if (pixelR == 255)
 		{
 			bool allPixelsRed = true;
+			//for (int i = -5; i < 6; i++)
 			for (int i = -8; i < 9; i++)
 			{
+				//for (int j = -5; j < 6; j++)
 				for (int j = -8; j < 9; j++)
 				{
 					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
@@ -226,4 +253,63 @@ Mat track(Mat frame) {
 	//return *outFrame;
 	//For the sake of debugging 
 	return frame;
+}
+
+//Array of Mat maybe causing issues
+Mat averageFrame(Mat buffer[3]) {
+	int threadCount = 1024;
+	int blocks = (X * Y - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = X * Y;
+	}
+	
+	//copy buffer frames to device memory GpuMat
+	//cv::cuda::GpuMat d_bufferFrames[3];
+	//d_bufferFrames[0].upload(buffer[0]);
+	//d_bufferFrames[1].upload(buffer[1]);
+	//d_bufferFrames[2].upload(buffer[2]);
+	cv::cuda::PtrStepSz<float> *bufferPtr;
+	cv::cuda::PtrStepSz<float> d_arr[3];
+	cv::cuda::GpuMat mats[3];
+	for (int i = 0; i < 3; i++) {
+		//mats[i].upload(buffer[i]);
+		d_arr[i] = mats[i];
+	}
+	//cudaMalloc((void**)&bufferPtr, sizeof(cv::cuda::PtrStepSz<float>)*3);
+	//cudaMemcpy(bufferPtr, d_arr, sizeof(cv::cuda::PtrStepSz<float>) * 3, cudaMemcpyHostToDevice);
+
+	//uint8_t *d_bufferPtr;
+	//uint8_t *d_outPtr;
+	//cv::cuda::GpuMat d_outFrame;
+	//d_bufferFrames[0].copyTo(d_outFrame);
+
+	//cudaMalloc((void **)&d_outPtr, d_outFrame.rows*d_outFrame.step);
+	//cudaMemcpyAsync(d_outPtr, d_outFrame.ptr<uint8_t>(), d_outFrame.rows*d_outFrame.step, cudaMemcpyDeviceToDevice);
+
+	//convert the frame to be completely black to avoid weird artifacts
+	//blackKernel<<<blocks, threadCount>>>(d_outFrame);
+
+	//allocate new device memory
+	//cudaMalloc((void**)&d_bufferPtr, 3*d_bufferFrames[0].rows*d_bufferFrames[0].step);
+	//cudaMemcpyAsync(d_bufferPtr, d_bufferFrames[0].ptr<uint8_t>(), 3 * d_bufferFrames[0].rows*d_bufferFrames[0].step, cudaMemcpyDeviceToDevice);
+
+	//averageKernel<<<blocks, threadCount>>>(d_outFrame, d_bufferFrames);
+
+	//free buffer pointer from device memory
+	//cudaFree(d_bufferPtr);
+	//d_bufferFrames[0].release();
+	//d_bufferFrames[1].release();
+	//d_bufferFrames[2].release();
+
+	Mat outFrame;
+	//d_outFrame.download(outFrame);
+	//free out pointer from device memory
+	//cudaFree(d_outPtr);
+	//d_outFrame.release();
+
+
+	//return outFrame;
+	//for the sake of debugging
+	return buffer[0];
 }
