@@ -55,14 +55,16 @@ int main() {
 		//imshow("frame", frame);
 		//Type is CV_U8 = unsigned char
 
-		//return initial frame image as well as tracking overlay
+		//keep initial frame image as well as tracking overlay
 		Mat outFrame = track(frame);
 		updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
-		bufferedFrameCount++;	
-		averageFrame(frameBuffer).copyTo(outFrame);
-		imshow("frame", outFrame);
-		if (waitKey(30) >= 0) break;
-		waitKey(1);
+		bufferedFrameCount++;
+		if (bufferedFrameCount > 2){
+			averageFrame(frameBuffer).copyTo(outFrame);
+			imshow("frame", outFrame);
+			if (waitKey(30) >= 0) break;
+			waitKey(1);
+		}
 	}
 	destroyAllWindows();
 	return 0;

@@ -10,7 +10,8 @@ using namespace cv::cuda;
 #define X 1280
 #define Y 720
 
-__global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat bufferFrames[3])
+//Not ideal, expectedly produces motion blur, but not in a nice way
+__global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[3]> bufferFrames[3])
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < X * Y)
@@ -19,10 +20,28 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat bufferFrame
 		int column = threadId % X;
 		bool colour = false;
 		for (int i = 0; i < 3; i++) {
+			//printf("1. %d\n", &bufferFrames[i]);
+			//cv::cuda::GpuMat thisMat = (cv::cuda::GpuMat) *bufferFrames[i];
+			//uint8_t B = bufferFrames[i](row, column)[0];
+			uint8_t G = bufferFrames[i](row, column)[1];
+			//uint8_t R = bufferFrames[i](row, column)[2];
+			//if ((B > 0)||(G > 0)||(R > 0)) {
+			//	printf("%d %d %d\n", B, G, R);
+			//}
 
-			if (bufferFrames[i].data[(row*bufferFrames[i].step) + column * 3 + 1] > 0) {
+			if (G > 0) {
+				//printf("%d %d\n", row, column);
 				colour = true;
 			}
+			
+			//printf("%d %d %d\n", row, column, bufferFrames[i](row, column));
+			//if (bufferFrames[i].ptr(row)[column] > 0) {
+				//printf("%d %d %f\n", row, column, bufferFrames[i].ptr(row)[column]);
+			//}			
+			//if (bufferFrames[i].data[(row*bufferFrames[i].step) + column * 3 + 1] > 0) {
+			//	colour = true;
+			//	printf(":D\n");
+			//}
 		}
 		
 
@@ -35,9 +54,80 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat bufferFrame
 	}
 }
 
-__global__ void detectObjectKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat cleanFrame)
+__global__ void detectObjectKernel(uint8_t *a, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
+	printf("test\n");
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < X * Y)
+	{
+		int row = threadId / X;
+		int column = threadId % X;
+		printf("%d", cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1]);
+		if (cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1] > 0) {
+			int maxX = column;
+			int maxY = row;
+			int minX = column;
+			int minY = row;
+			bool traversable = true;
+			int pixelList[2][X*Y];
+			pixelList[0][0] = column;
+			pixelList[1][0] = row;
+			int listLength = 1;
+			frameCopy.data[row*frameCopy.step + column * 3 + 1] = 0;
+			while (traversable){
+				int newPixels = 0;
+				for (int i = 0; i < listLength; i++) {
+					int x = pixelList[0][i];
+					int y = pixelList[1][i];
+					if (x < X){
+						if (frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] > 0) {
+							pixelList[0][listLength] = x + 1;
+							pixelList[1][listLength] = y;
+							listLength++;
+							newPixels++;
+							frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] = 0;
+							maxX++;
+						}
+					}
+					if (x > 0){
+						if (frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] > 0) {
+							pixelList[0][listLength] = x - 1;
+							pixelList[1][listLength] = y;
+							listLength++;
+							newPixels++;
+							frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] = 0;
+							minX--;
+						}
+					}
+					if (y < Y){
+						if (frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] > 0) {
+							pixelList[0][listLength] = x;
+							pixelList[1][listLength] = y + 1;
+							listLength++;
+							newPixels++;
+							frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] = 0;
+							maxY++;
+						}
+					}
+					if (y > 0){
+						if (frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] > 0) {
+							pixelList[0][listLength] = x;
+							pixelList[1][listLength] = y - 1;
+							listLength++;
+							newPixels++;
+							frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] = 0;
+							minY--;
+						}
+					}
+				}
+				if (newPixels == 0) {
+					traversable = false;
+					printf("%d %d %d %d\n", minX, maxX, minY, maxY);
+				}
+			}
+		}
+	}
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -53,10 +143,12 @@ __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
 		{
 			bool allPixelsRed = true;
 			//for (int i = -5; i < 6; i++)
-			for (int i = -8; i < 9; i++)
+			//for (int i = -8; i < 9; i++)
+			for (int i = -2; i < 3; i++)
 			{
 				//for (int j = -5; j < 6; j++)
-				for (int j = -8; j < 9; j++)
+				//for (int j = -8; j < 9; j++)
+				for (int j = -2; j < 3; j++)
 				{
 					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 					{
@@ -88,9 +180,10 @@ __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 
 		if (pixelR == 255)
 		{
-			for (int i = -8; i < 9; i++)
+			//for (int i = -8; i < 9; i++)
+			for (int i = -6; i < 7; i++)
 			{
-				for (int j = -8; j < 9; j++)
+				for (int j = -6; j < 7; j++)
 				{
 					if (!(i == 0 && j == 0))
 					{
@@ -126,7 +219,8 @@ __global__ void getRedKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat frame)
 		//out.data[(row*out.step) + column * 3 + 1] = pixelG;
 		//out.data[(row*out.step) + column * 3 + 2] = pixelR;
 		//if ((pixelR > 128) && (pixelB < 50) && (pixelG < 50))
-		if (((pixelR > 128) && (pixelB < 10) && (pixelG < 10))||((pixelR > 100)&&(pixelB < 4)&&(pixelG < 4)) || ((pixelR > 90) && (pixelB < 1) && (pixelG < 1)))
+		if ((pixelR > 80) && (pixelB < 10) && (pixelG < 10))
+		//if (((pixelR > 128) && (pixelB < 10) && (pixelG < 10))||((pixelR > 100)&&(pixelB < 4)&&(pixelG < 4)) || ((pixelR > 90) && (pixelB < 1) && (pixelG < 1)))
 		//if (((pixelR > 100) && (pixelB < 5) && (pixelG < 5)))
 		//if ((pixelR > 4*(pixelB + pixelG))&&(pixelR > 110))
 		{
@@ -242,6 +336,24 @@ Mat track(Mat frame) {
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
 
+	uint8_t *trackingLocations = (uint8_t*)malloc(3 * 100 * sizeof(uint8_t));
+	uint8_t *d_trackingLocations;
+	uint8_t *d_copyFramePtr;
+	cv::cuda::GpuMat d_copyFrame;
+	d_erodedFrame.copyTo(d_copyFrame);
+	//Allocate new device memory
+	cudaMalloc((void**)&d_copyFramePtr, d_copyFrame.rows*d_copyFrame.step);
+	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
+
+	cudaMalloc((void**)&d_trackingLocations, sizeof(uint8_t) * 3 * 100);
+	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_erodedFrame, d_copyFrame);
+
+	//preventing memory leaks, in the wrong positon right now, purposely
+	free(trackingLocations);
+	cudaFree(d_trackingLocations);
+	cudaFree(d_copyFramePtr);
+
+
 	Mat outFrame;
 	d_erodedFrame.download(outFrame);
 	
@@ -255,7 +367,6 @@ Mat track(Mat frame) {
 	return frame;
 }
 
-//Array of Mat maybe causing issues
 Mat averageFrame(Mat buffer[3]) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
@@ -269,44 +380,51 @@ Mat averageFrame(Mat buffer[3]) {
 	//d_bufferFrames[0].upload(buffer[0]);
 	//d_bufferFrames[1].upload(buffer[1]);
 	//d_bufferFrames[2].upload(buffer[2]);
-	cv::cuda::PtrStepSz<float> *bufferPtr;
-	cv::cuda::PtrStepSz<float> d_arr[3];
-	cv::cuda::GpuMat mats[3];
+	
+	
+	//cv::cuda::PtrStepSz<float> *bufferPtr;
+	//cv::cuda::PtrStepSz<float> d_arr[3];
+	cv::cuda::PtrStepSz<uint8_t[3]> *bufferPtr;
+	cv::cuda::PtrStepSz<uint8_t[3]> d_arr[3];
+	cv::cuda::GpuMat d_bufferFrames[3];
 	for (int i = 0; i < 3; i++) {
-		//mats[i].upload(buffer[i]);
-		d_arr[i] = mats[i];
+		d_bufferFrames[i].upload(buffer[i]);
+		d_arr[i] = d_bufferFrames[i];
 	}
+	cudaMalloc((void**)&bufferPtr, sizeof(cv::cuda::PtrStepSz<uint8_t[3]>) * 3);
+	cudaMemcpy(bufferPtr, d_arr, sizeof(cv::cuda::PtrStepSz<uint8_t[3]>) * 3, cudaMemcpyHostToDevice);
+	
 	//cudaMalloc((void**)&bufferPtr, sizeof(cv::cuda::PtrStepSz<float>)*3);
 	//cudaMemcpy(bufferPtr, d_arr, sizeof(cv::cuda::PtrStepSz<float>) * 3, cudaMemcpyHostToDevice);
 
-	//uint8_t *d_bufferPtr;
-	//uint8_t *d_outPtr;
-	//cv::cuda::GpuMat d_outFrame;
-	//d_bufferFrames[0].copyTo(d_outFrame);
+	uint8_t *d_bufferPtr;
+	uint8_t *d_outPtr;
+	cv::cuda::GpuMat d_outFrame;
+	d_bufferFrames[0].copyTo(d_outFrame);
 
-	//cudaMalloc((void **)&d_outPtr, d_outFrame.rows*d_outFrame.step);
-	//cudaMemcpyAsync(d_outPtr, d_outFrame.ptr<uint8_t>(), d_outFrame.rows*d_outFrame.step, cudaMemcpyDeviceToDevice);
+	cudaMalloc((void **)&d_outPtr, d_outFrame.rows*d_outFrame.step);
+	cudaMemcpyAsync(d_outPtr, d_outFrame.ptr<uint8_t>(), d_outFrame.rows*d_outFrame.step, cudaMemcpyDeviceToDevice);
 
 	//convert the frame to be completely black to avoid weird artifacts
-	//blackKernel<<<blocks, threadCount>>>(d_outFrame);
+	blackKernel<<<blocks, threadCount>>>(d_outFrame);
 
 	//allocate new device memory
-	//cudaMalloc((void**)&d_bufferPtr, 3*d_bufferFrames[0].rows*d_bufferFrames[0].step);
-	//cudaMemcpyAsync(d_bufferPtr, d_bufferFrames[0].ptr<uint8_t>(), 3 * d_bufferFrames[0].rows*d_bufferFrames[0].step, cudaMemcpyDeviceToDevice);
+	cudaMalloc((void**)&d_bufferPtr, 3*d_bufferFrames[0].rows*d_bufferFrames[0].step);
+	cudaMemcpyAsync(d_bufferPtr, d_bufferFrames[0].ptr<uint8_t>(), 3 * d_bufferFrames[0].rows*d_bufferFrames[0].step, cudaMemcpyDeviceToDevice);
 
-	//averageKernel<<<blocks, threadCount>>>(d_outFrame, d_bufferFrames);
+	averageKernel<<<blocks, threadCount>>>(d_outFrame, bufferPtr);//d_bufferFrames);
 
 	//free buffer pointer from device memory
-	//cudaFree(d_bufferPtr);
-	//d_bufferFrames[0].release();
-	//d_bufferFrames[1].release();
-	//d_bufferFrames[2].release();
+	cudaFree(d_bufferPtr);
+	d_bufferFrames[0].release();
+	d_bufferFrames[1].release();
+	d_bufferFrames[2].release();
 
 	Mat outFrame;
 	//d_outFrame.download(outFrame);
 	//free out pointer from device memory
-	//cudaFree(d_outPtr);
-	//d_outFrame.release();
+	cudaFree(d_outPtr);
+	d_outFrame.release();
 
 
 	//return outFrame;
