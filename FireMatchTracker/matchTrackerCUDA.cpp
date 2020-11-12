@@ -60,7 +60,7 @@ int main() {
 		updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
 		bufferedFrameCount++;
 		if (bufferedFrameCount > 2){
-			averageFrame(frameBuffer).copyTo(outFrame);
+			//averageFrame(frameBuffer).copyTo(outFrame);
 			imshow("frame", outFrame);
 			if (waitKey(30) >= 0) break;
 			waitKey(1);

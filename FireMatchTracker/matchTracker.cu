@@ -57,13 +57,12 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 __global__ void detectObjectKernel(uint8_t *a, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
-	printf("test\n");
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < X * Y)
 	{
 		int row = threadId / X;
 		int column = threadId % X;
-		printf("%d", cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1]);
+		//printf("%d", cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1]);
 		if (cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1] > 0) {
 			int maxX = column;
 			int maxY = row;
@@ -123,7 +122,7 @@ __global__ void detectObjectKernel(uint8_t *a, cv::cuda::GpuMat cleanFrame, cv::
 				}
 				if (newPixels == 0) {
 					traversable = false;
-					printf("%d %d %d %d\n", minX, maxX, minY, maxY);
+					//printf("%d %d %d %d\n", minX, maxX, minY, maxY);
 				}
 			}
 		}
@@ -288,6 +287,7 @@ Mat track(Mat frame) {
 	//transfer memory from host to device memory
 	//cudaMemcpy(d_newFrame, newFrame, sizeof(frame), cudaMemcpyHostToDevice);
 	getRedKernel<<<blocks, threadCount>>>(d_outFrame, d_newFrame);
+	cudaDeviceSynchronize();
 	//Free newFrame device and host memory
 	//cudaFree(d_newFrame);
 	//free(newFrame);
@@ -314,7 +314,7 @@ Mat track(Mat frame) {
 	cudaMemcpyAsync(d_dilatedPtr, d_dilatedFrame.ptr<uint8_t>(), d_dilatedFrame.rows*d_dilatedFrame.step, cudaMemcpyDeviceToDevice);
 
 	dilateKernel<<<blocks, threadCount>>>(d_dilatedFrame, d_outFrame);	
-	
+	cudaDeviceSynchronize();
 	//Free outFrame pointer device memory
 	cudaFree(d_outPtr);
 	d_outFrame.release();
@@ -329,9 +329,9 @@ Mat track(Mat frame) {
 
 	//convert the frame to be completely black to avoid weird artifacts
 	blackKernel<<<blocks, threadCount>>>(d_erodedFrame);
-	
+	cudaDeviceSynchronize();
 	erodeKernel<<<blocks, threadCount>>>(d_erodedFrame, d_dilatedFrame);
-	
+	cudaDeviceSynchronize();
 	//Free dilatedFrame pointer device memory
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
@@ -346,8 +346,11 @@ Mat track(Mat frame) {
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 
 	cudaMalloc((void**)&d_trackingLocations, sizeof(uint8_t) * 3 * 100);
+
+	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_erodedFrame, d_copyFrame);
 
+	cudaDeviceSynchronize();
 	//preventing memory leaks, in the wrong positon right now, purposely
 	free(trackingLocations);
 	cudaFree(d_trackingLocations);
