@@ -54,7 +54,7 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 	}
 }
 
-__global__ void detectObjectKernel(uint8_t *a, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
+__global__ void detectObjectKernel(int *a, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -132,7 +132,7 @@ __global__ void detectObjectKernel(uint8_t *a, cv::cuda::GpuMat cleanFrame, cv::
 		}
 	}
 	__syncthreads();
-
+	a[0] = 10;
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -342,8 +342,8 @@ Mat track(Mat frame) {
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
 
-	uint8_t *trackingLocations = (uint8_t*)malloc(2 * X * Y * sizeof(uint8_t));
-	uint8_t *d_trackingLocations;
+	int *trackingLocations = (int*)malloc(2 * X * Y * sizeof(int));
+	int *d_trackingLocations;
 	uint8_t *d_copyFramePtr;
 	cv::cuda::GpuMat d_copyFrame;
 	d_erodedFrame.copyTo(d_copyFrame);
@@ -351,15 +351,16 @@ Mat track(Mat frame) {
 	cudaMalloc((void**)&d_copyFramePtr, d_copyFrame.rows*d_copyFrame.step);
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 
-	cudaMalloc((void**)&d_trackingLocations, sizeof(uint8_t) * X * Y);
+	cudaMalloc((void**)&d_trackingLocations, sizeof(int) * X * Y * 2);
 
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_erodedFrame, d_copyFrame);
-
+	cudaGetLastError();
 	cudaDeviceSynchronize();
 
-	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * X * Y * sizeof(uint8_t), cudaMemcpyDeviceToHost);
-	printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
+	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * X * Y * sizeof(int), cudaMemcpyDeviceToHost);
+	//printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
+	//printf("%d %d %d %d\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 
 	//preventing memory leaks, in the wrong positon right now, purposely
 	free(trackingLocations);
