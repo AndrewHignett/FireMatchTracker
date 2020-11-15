@@ -125,8 +125,14 @@ __global__ void detectObjectKernel(uint8_t *a, cv::cuda::GpuMat cleanFrame, cv::
 					//printf("%d %d %d %d\n", minX, maxX, minY, maxY);
 				}
 			}
+			int centreX = (maxX - minX) / 2;
+			int centreY = (maxY - minY) / 2;
+			a[threadId] = centreX;
+			a[1 + threadId] = centreY;
 		}
 	}
+	__syncthreads();
+
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -336,7 +342,7 @@ Mat track(Mat frame) {
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
 
-	uint8_t *trackingLocations = (uint8_t*)malloc(3 * 100 * sizeof(uint8_t));
+	uint8_t *trackingLocations = (uint8_t*)malloc(2 * X * Y * sizeof(uint8_t));
 	uint8_t *d_trackingLocations;
 	uint8_t *d_copyFramePtr;
 	cv::cuda::GpuMat d_copyFrame;
@@ -345,12 +351,16 @@ Mat track(Mat frame) {
 	cudaMalloc((void**)&d_copyFramePtr, d_copyFrame.rows*d_copyFrame.step);
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 
-	cudaMalloc((void**)&d_trackingLocations, sizeof(uint8_t) * 3 * 100);
+	cudaMalloc((void**)&d_trackingLocations, sizeof(uint8_t) * X * Y);
 
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_erodedFrame, d_copyFrame);
 
 	cudaDeviceSynchronize();
+
+	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * X * Y * sizeof(uint8_t), cudaMemcpyDeviceToHost);
+	printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
+
 	//preventing memory leaks, in the wrong positon right now, purposely
 	free(trackingLocations);
 	cudaFree(d_trackingLocations);
