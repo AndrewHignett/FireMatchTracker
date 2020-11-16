@@ -54,7 +54,8 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 	}
 }
 
-__global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
+//Having clean frame may not be necessary, so long as threads are synced after accessing the original frame
+__global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)//, int *a , cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -62,6 +63,9 @@ __global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cud
 	{
 		int row = threadId / X;
 		int column = threadId % X;
+		trackedFrame.data[(row*trackedFrame.step) + column * 3] = 0;
+		trackedFrame.data[(row*trackedFrame.step) + column * 3 + 1] = 0;
+		trackedFrame.data[(row*trackedFrame.step) + column * 3 + 2] = 0;
 		uint8_t pixelGClean = cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1];
 		if (pixelGClean == 255) {
 			int maxX = column;
@@ -69,19 +73,22 @@ __global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cud
 			int minX = column;
 			int minY = row;
 			bool traversable = true;
-			//Previous error came from this array being too large. Make the array relatively small and overwrite unusable pixels.
-			int pixelList[2][2*(X+Y)] = {};
+			int pixelList[2][2 * (X + Y)];
 			pixelList[0][0] = column;
 			pixelList[1][0] = row;
 			int listLength = 1;
 			frameCopy.data[row*frameCopy.step + column * 3 + 1] = 0;
 			while (traversable) {
+				//error is in here, potentially a misuse of pixelList
 				int newPixels = 0;
 				for (int i = 0; i < listLength; i++) {
 					int x = pixelList[0][i];
 					int y = pixelList[1][i];
+					if (i > 10) {
+						printf("%d\n", i);
+					}
 					int newPixelsFromThisPixel = 0;
-					if (x < X) {
+					if (x < X - 1) {
 						uint8_t pixelGcopy = frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1];
 						//if (frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] > 0) {
 						if (pixelGcopy == 255) {
@@ -90,7 +97,7 @@ __global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cud
 							listLength++;
 							newPixels++;
 							newPixelsFromThisPixel++;
-							//frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] = 0;
+							frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] = 0;
 							maxX++;
 						}
 					}
@@ -103,11 +110,11 @@ __global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cud
 							listLength++;
 							newPixels++;
 							newPixelsFromThisPixel++;
-							//frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] = 0;
+							frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] = 0;
 							minX--;
 						}
 					}
-					if (y < Y) {
+					if (y < Y - 1) {
 						uint8_t pixelGcopy = frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1];
 						//if (frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] > 0) {
 						if (pixelGcopy == 255) {
@@ -116,7 +123,7 @@ __global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cud
 							listLength++;
 							newPixels++;
 							newPixelsFromThisPixel++;
-							//frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] = 0;
+							frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] = 0;
 							maxY++;
 						}
 					}
@@ -129,27 +136,41 @@ __global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cud
 							listLength++;
 							newPixels++;
 							newPixelsFromThisPixel++;
-							//frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] = 0;
+							frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] = 0;
 							minY--;
 						}
 					}
 					if (newPixelsFromThisPixel == 0) {
-
+						//remove ith pixel from pixelList
+						for (int j = i; j < listLength - 1; j++) {
+							pixelList[0][j] = pixelList[0][j + 1];
+							pixelList[1][j] = pixelList[1][j + 1];
+						}
+						//reduce length of list
+						listLength--;
 					}
 				}
 				if (newPixels == 0) {
 					traversable = false;
-					//printf("%d %d %d %d\n", minX, maxX, minY, maxY);
+					if (minX != maxX){
+						//printf("%d %d %d %d\n", minX, maxX, minY, maxY);
+					}
+					if (minY != maxY) {
+						//printf("%d %d %d %d\n", minX, maxX, minY, maxY);
+					}
 				}
 			}
-			int centreX = (maxX - minX) / 2;
-			int centreY = (maxY - minY) / 2;
-			a[threadId] = centreX;
-			a[1 + threadId] = centreY;
+			int centreX = (maxX - minX) / 2 + minX;
+			int centreY = (maxY - minY) / 2 + minY;
+			//printf("%d %d\n", centreX, centreY);
+			trackedFrame.data[(centreY*trackedFrame.step) + centreX * 3] = 255;
+			//a[threadId] = centreX;
+			//a[1 + threadId] = centreY;
+			//for testing
+			//trackedFrame.data[(row*trackedFrame.step) + column * 3] = 255;
 		}
 	}
-	__syncthreads();
-	//a[0] = 10;
+	//__syncthreads();
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -359,40 +380,51 @@ Mat track(Mat frame) {
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
 
-	int *trackingLocations = (int*)malloc(2 * X * Y * sizeof(int));
-	int *d_trackingLocations;
+	//int *trackingLocations = (int*)malloc(2*(X + Y) * sizeof(int));
+	//int *d_trackingLocations;
 	uint8_t *d_copyFramePtr;
 	cv::cuda::GpuMat d_copyFrame;
+	uint8_t *d_trackedFramePtr;
+	cv::cuda::GpuMat d_trackedFrame;
 	d_erodedFrame.copyTo(d_copyFrame);
+	d_erodedFrame.copyTo(d_trackedFrame);
 	//Allocate new device memory
 	cudaMalloc((void**)&d_copyFramePtr, d_copyFrame.rows*d_copyFrame.step);
+	cudaMalloc((void**)&d_trackedFramePtr, d_trackedFrame.rows*d_trackedFrame.step);
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
+	cudaMemcpyAsync(d_trackedFramePtr, d_trackedFrame.ptr<uint8_t>(), d_trackedFrame.rows*d_trackedFrame.step, cudaMemcpyDeviceToDevice);
 
-	cudaMalloc((void**)&d_trackingLocations, sizeof(int) * X * Y * 2);
+	//cudaMalloc((void**)&d_trackingLocations, 2 * (X + Y) * sizeof(int));
 	
-	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_erodedFrame, d_copyFrame);
+	//detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_trackingLocations, d_erodedFrame, d_copyFrame);
+	detectObjectKernel << <blocks, threadCount >> > (d_trackedFrame, d_erodedFrame, d_copyFrame);
 	cudaError_t error2 = cudaGetLastError();
 	if (error2 != cudaSuccess) {
 		printf("2. Error: %s\n", cudaGetErrorString(error2));
 	}
 	cudaDeviceSynchronize();
 
-	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * X * Y * sizeof(int), cudaMemcpyDeviceToHost);
+	//cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X + Y) * sizeof(int), cudaMemcpyDeviceToHost);
 	//printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 	//printf("%d %d %d %d\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 
 	//preventing memory leaks, in the wrong positon right now, purposely
-	free(trackingLocations);
-	cudaFree(d_trackingLocations);
+	//free(trackingLocations);
+	//cudaFree(d_trackingLocations);
 	cudaFree(d_copyFramePtr);
-
+	d_copyFrame.release();
 
 	Mat outFrame;
-	d_erodedFrame.download(outFrame);
-	
-	//Free dilatedFrame pointer device memory
+	d_trackedFrame.download(outFrame);
+	//d_erodedFrame.download(outFrame);
+
+	//Free erodedFrame pointer device memory
 	cudaFree(d_erodedPtr);
 	d_erodedFrame.release();
+
+	//Free the tracked frame from device memory
+	cudaFree(d_trackedFramePtr);
+	d_trackedFrame.release();
 	
 	return outFrame;
 	//return *outFrame;
