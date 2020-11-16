@@ -54,7 +54,7 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 	}
 }
 
-__global__ void detectObjectKernel(int *a, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
+__global__ void detectObjectKernel(int *a , cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -62,62 +62,79 @@ __global__ void detectObjectKernel(int *a, cv::cuda::GpuMat cleanFrame, cv::cuda
 	{
 		int row = threadId / X;
 		int column = threadId % X;
-		//printf("%d", cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1]);
-		if (cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1] > 0) {
+		uint8_t pixelGClean = cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1];
+		if (pixelGClean == 255) {
 			int maxX = column;
 			int maxY = row;
 			int minX = column;
 			int minY = row;
 			bool traversable = true;
-			int pixelList[2][X*Y];
+			//Previous error came from this array being too large. Make the array relatively small and overwrite unusable pixels.
+			int pixelList[2][2*(X+Y)] = {};
 			pixelList[0][0] = column;
 			pixelList[1][0] = row;
 			int listLength = 1;
 			frameCopy.data[row*frameCopy.step + column * 3 + 1] = 0;
-			while (traversable){
+			while (traversable) {
 				int newPixels = 0;
 				for (int i = 0; i < listLength; i++) {
 					int x = pixelList[0][i];
 					int y = pixelList[1][i];
-					if (x < X){
-						if (frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] > 0) {
+					int newPixelsFromThisPixel = 0;
+					if (x < X) {
+						uint8_t pixelGcopy = frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1];
+						//if (frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] > 0) {
+						if (pixelGcopy == 255) {
 							pixelList[0][listLength] = x + 1;
 							pixelList[1][listLength] = y;
 							listLength++;
 							newPixels++;
-							frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] = 0;
+							newPixelsFromThisPixel++;
+							//frameCopy.data[y*frameCopy.step + (x + 1) * 3 + 1] = 0;
 							maxX++;
 						}
 					}
-					if (x > 0){
-						if (frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] > 0) {
+					if (x > 0) {
+						uint8_t pixelGcopy = frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1];
+						//if (frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] > 0) {
+						if (pixelGcopy == 255) {
 							pixelList[0][listLength] = x - 1;
 							pixelList[1][listLength] = y;
 							listLength++;
 							newPixels++;
-							frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] = 0;
+							newPixelsFromThisPixel++;
+							//frameCopy.data[y*frameCopy.step + (x - 1) * 3 + 1] = 0;
 							minX--;
 						}
 					}
-					if (y < Y){
-						if (frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] > 0) {
+					if (y < Y) {
+						uint8_t pixelGcopy = frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1];
+						//if (frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] > 0) {
+						if (pixelGcopy == 255) {
 							pixelList[0][listLength] = x;
 							pixelList[1][listLength] = y + 1;
 							listLength++;
 							newPixels++;
-							frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] = 0;
+							newPixelsFromThisPixel++;
+							//frameCopy.data[(y + 1)*frameCopy.step + x * 3 + 1] = 0;
 							maxY++;
 						}
 					}
-					if (y > 0){
-						if (frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] > 0) {
+					if (y > 0) {
+						uint8_t pixelGcopy = frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1];
+						//if (frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] > 0) {
+						if (pixelGcopy == 255) {
 							pixelList[0][listLength] = x;
 							pixelList[1][listLength] = y - 1;
 							listLength++;
 							newPixels++;
-							frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] = 0;
+							newPixelsFromThisPixel++;
+							//frameCopy.data[(y - 1)*frameCopy.step + x * 3 + 1] = 0;
 							minY--;
 						}
+					}
+					if (newPixelsFromThisPixel == 0) {
+
 					}
 				}
 				if (newPixels == 0) {
@@ -132,7 +149,7 @@ __global__ void detectObjectKernel(int *a, cv::cuda::GpuMat cleanFrame, cv::cuda
 		}
 	}
 	__syncthreads();
-	a[0] = 10;
+	//a[0] = 10;
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -352,10 +369,12 @@ Mat track(Mat frame) {
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 
 	cudaMalloc((void**)&d_trackingLocations, sizeof(int) * X * Y * 2);
-
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_erodedFrame, d_copyFrame);
-	cudaGetLastError();
+	cudaError_t error2 = cudaGetLastError();
+	if (error2 != cudaSuccess) {
+		printf("2. Error: %s\n", cudaGetErrorString(error2));
+	}
 	cudaDeviceSynchronize();
 
 	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * X * Y * sizeof(int), cudaMemcpyDeviceToHost);
