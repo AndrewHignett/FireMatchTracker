@@ -55,7 +55,7 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 }
 
 //can be sped up by ensuring that the list is ordered and using efficient searching
-__device__ bool inArray(int pixelList[2][(X * Y) / 100], int x, int y, int listLength, int thread)
+__device__ bool inArray(int pixelList[2][(X * Y) / 200], int x, int y, int listLength, int thread)
 {
 	for (int i = 0; i < listLength; i++) {
 		if (((pixelList[0][i] == x) && (pixelList[1][i] == y))||((pixelList[0][i] == x + X) && (pixelList[1][i] == y + Y))) {		
@@ -65,6 +65,8 @@ __device__ bool inArray(int pixelList[2][(X * Y) / 100], int x, int y, int listL
 	return false;
 }
 
+//runs very slowly when there's a lot of red, due to there being a lot of pixels, possibly fixable, but definitely improvable through inArray search optimisation
+//can optimise by removing pixels that aren't useful, such as those in 
 __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)//, int *a , cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
@@ -85,7 +87,12 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 			int minX = column;
 			int minY = row;
 			bool traversable = true;
-			int pixelList[2][(X * Y)/100];
+			//change pixel list to be a tree, this means faster inArray() searching, but requires different adding pixels method. Should be faster overall.
+			//sort by x value
+			//Uknown how much this will impact memory usage
+			//Current array size is unstable, only works up until half the pixels being red (displayed as green), but saves memory and it's expected there's effort 
+			//to be as few red pixels as possible
+			int pixelList[2][(X * Y)/200];
 			pixelList[0][0] = column;
 			pixelList[1][0] = row;
 			int listLength = 1;
@@ -253,9 +260,6 @@ __global__ void getRedKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat frame)
 		uint8_t pixelB = frame.data[(row*frame.step) + column * 3];
 		uint8_t pixelG = frame.data[(row*frame.step) + column * 3 + 1];
 		uint8_t pixelR = frame.data[(row*frame.step) + column * 3 + 2];
-		//out.data[(row*out.step) + column * 3] = pixelB;
-		//out.data[(row*out.step) + column * 3 + 1] = pixelG;
-		//out.data[(row*out.step) + column * 3 + 2] = pixelR;
 		//if ((pixelR > 128) && (pixelB < 50) && (pixelG < 50))
 		if ((pixelR > 80) && (pixelB < 10) && (pixelG < 10))
 		//if (((pixelR > 128) && (pixelB < 10) && (pixelG < 10))||((pixelR > 100)&&(pixelB < 4)&&(pixelG < 4)) || ((pixelR > 90) && (pixelB < 1) && (pixelG < 1)))
@@ -296,10 +300,6 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 }
 
 Mat track(Mat frame) {
-	//Mat *newFrame = (Mat*)malloc(X * Y * sizeof(Mat));
-	//Mat *newFrame = (Mat*)malloc(sizeof(frame));
-	//Mat *outFrame = (Mat*)malloc(sizeof(frame));
-	//*newFrame = frame.clone();
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
 	if (blocks == 1)
@@ -307,8 +307,6 @@ Mat track(Mat frame) {
 		threadCount = X * Y;
 	}
 	//Set up device variables
-	//Mat *d_newFrame;
-	//Mat *d_outFrame;
 	uint8_t *d_imgPtr;
 	uint8_t *d_outPtr;
 	cv::cuda::GpuMat d_newFrame;
