@@ -54,19 +54,6 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 	}
 }
 
-//can be sped up by ensuring that the list is ordered and using efficient searching
-__device__ bool inArray(int pixelList[2][(X * Y) / 200], int x, int y, int listLength, int thread)
-{
-	for (int i = 0; i < listLength; i++) {
-		if (((pixelList[0][i] == x) && (pixelList[1][i] == y))||((pixelList[0][i] == x + X) && (pixelList[1][i] == y + Y))) {		
-			return true;
-		}
-	}
-	return false;
-}
-
-//runs very slowly when there's a lot of red, due to there being a lot of pixels, possibly fixable, but definitely improvable through inArray search optimisation
-//can optimise by removing pixels that aren't useful, such as those in 
 __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)//, int *a , cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
@@ -87,79 +74,71 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 			int minX = column;
 			int minY = row;
 			bool traversable = true;
-			//change pixel list to be a tree, this means faster inArray() searching, but requires different adding pixels method. Should be faster overall.
-			//sort by x value
-			//Uknown how much this will impact memory usage
 			//Current array size is unstable, only works up until half the pixels being red (displayed as green), but saves memory and it's expected there's effort 
 			//to be as few red pixels as possible
 			int pixelList[2][(X * Y)/200];
+			bool pixelUsed[X / 10][Y / 10] = {0};
 			pixelList[0][0] = column;
 			pixelList[1][0] = row;
 			int listLength = 1;
-			int currentListLength = 1;
 			frameCopy.data[row*frameCopy.step + column * 3 + 1] = 0;
-			while (traversable) {
-				int newPixels = 0;
-				currentListLength = listLength;
-				for (int i = 0; i < currentListLength; i++) {
-					int x = pixelList[0][i];
-					int y = pixelList[1][i];
-					if ((y < Y)&&(x < X)){
-						if (x < X - 10) {
-							uint8_t pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x + 10) * 3 + 1];
-							if ((pixelGcleanTest == 255)&&(!inArray(pixelList, x + 10, y, currentListLength, threadId))){
-								pixelList[0][listLength] = x + 10;
-								pixelList[1][listLength] = y;
-								listLength++;
-								newPixels++;
-								if (x + 10 > maxX) {
-									maxX = maxX + 10;
-								}
+			while (listLength > 0){
+				int x = pixelList[0][0];
+				int y = pixelList[1][0];
+				if (!pixelUsed[x/10][y/10]){
+					if (x < X - 10) {
+						uint8_t pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x + 10) * 3 + 1];
+						if ((pixelGcleanTest == 255)&&(!pixelUsed[(x+10)/10][y/10])){
+							pixelList[0][listLength] = x + 10;
+							pixelList[1][listLength] = y;
+							listLength++;
+							if (x + 10 > maxX) {
+								maxX = maxX + 10;
 							}
 						}
-						if (x > 9) {
-							uint8_t pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x - 10) * 3 + 1];
-							if ((pixelGcleanTest == 255) && (!inArray(pixelList, x - 10, y, currentListLength, threadId))) {
-								pixelList[0][listLength] = x - 10;
-								pixelList[1][listLength] = y;
-								listLength++;
-								newPixels++;
-								if (x - 10 < minX) {
-									minX = minX - 10;
-								}
+					}
+					if (x > 9) {
+						uint8_t pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x - 10) * 3 + 1];
+						if ((pixelGcleanTest == 255) && (!pixelUsed[(x-10) / 10][y / 10])){
+							pixelList[0][listLength] = x - 10;
+							pixelList[1][listLength] = y;
+							listLength++;
+							if (x - 10 < minX) {
+								minX = minX - 10;
 							}
 						}
-						if (y < Y - 10) {
-							uint8_t pixelGcleanTest = cleanFrame.data[(y + 10)*cleanFrame.step + x * 3 + 1];
-							if ((pixelGcleanTest == 255) && (!inArray(pixelList, x, y + 10, listLength, threadId))) {
-								pixelList[0][listLength] = x;
-								pixelList[1][listLength] = y + 10;
-								listLength++;
-								newPixels++;
-								if (y + 10 > maxY) {
-									maxY = maxY + 10;
-								}
+					}
+					if (y < Y - 10) {
+						uint8_t pixelGcleanTest = cleanFrame.data[(y + 10)*cleanFrame.step + x * 3 + 1];
+						if ((pixelGcleanTest == 255) && (!pixelUsed[x / 10][(y+10) / 10])) {
+							pixelList[0][listLength] = x;
+							pixelList[1][listLength] = y + 10;
+							listLength++;
+							if (y + 10 > maxY) {
+								maxY = maxY + 10;
 							}
 						}
-						if (y > 9) {
-							uint8_t pixelGcleanTest = cleanFrame.data[(y - 10)*cleanFrame.step + x * 3 + 1];
-							if ((pixelGcleanTest == 255) && (!inArray(pixelList, x, y - 10, listLength, threadId))) {
-								pixelList[0][listLength] = x;
-								pixelList[1][listLength] = y - 10;
-								listLength++;
-								newPixels++;
-								if (y - 10 < minY) {
-									minY = minY - 10;
-								}
+					}
+					if (y > 9) {
+						uint8_t pixelGcleanTest = cleanFrame.data[(y - 10)*cleanFrame.step + x * 3 + 1];
+						if ((pixelGcleanTest == 255) && (!pixelUsed[x / 10][(y-10) / 10])) {
+							pixelList[0][listLength] = x;
+							pixelList[1][listLength] = y - 10;
+							listLength++;
+							if (y - 10 < minY) {
+								minY = minY - 10;
 							}
 						}
-						pixelList[0][i] = pixelList[0][i] + X;
-						pixelList[1][i] = pixelList[1][i] + Y;
 					}
 				}
-				if (newPixels == 0) {
-					traversable = false;
-				}
+				pixelUsed[x / 10][y / 10] = true;
+				int xTemp = pixelList[0][listLength - 1];
+				int yTemp = pixelList[1][listLength - 1];
+				pixelList[0][listLength - 1] = pixelList[0][0];
+				pixelList[1][listLength - 1] = pixelList[1][0];
+				pixelList[0][0] = xTemp;
+				pixelList[1][0] = yTemp;
+				listLength--;
 			}
 			int centreX = (maxX - minX) / 2 + minX;
 			int centreY = (maxY - minY) / 2 + minY;
@@ -391,7 +370,6 @@ Mat track(Mat frame) {
 	
 	//detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_trackingLocations, d_erodedFrame, d_copyFrame);
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_erodedFrame, d_copyFrame);
-	//detectObjectKernel<<<1, 1>>>(d_trackedFrame, d_erodedFrame, d_copyFrame);
 	cudaError_t error2 = cudaGetLastError();
 	if (error2 != cudaSuccess) {
 		printf("2. Error: %s\n", cudaGetErrorString(error2));
