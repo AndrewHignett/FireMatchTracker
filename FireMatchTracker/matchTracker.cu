@@ -250,19 +250,12 @@ __global__ void getRedKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat frame)
 		//if (((pixelR > 100) && (pixelB < 5) && (pixelG < 5)))
 		//if ((pixelR > 4*(pixelB + pixelG))&&(pixelR > 110))
 		{
-
-			//out.data[(row*out.step) + column * 3] = pixelB;
-			//out.data[(row*out.step) + column * 3 + 1] = pixelG;
-			//out.data[(row*out.step) + column * 3 + 2] = pixelR;
 			out.data[(row*out.step) + column * 3] = 0;
 			out.data[(row*out.step) + column * 3 + 1] = 0;
 			out.data[(row*out.step) + column * 3 + 2] = 255;
 		}
 		else
 		{
-			//out.data[(row*out.step) + column * 3] = pixelB/2;
-			//out.data[(row*out.step) + column * 3 + 1] = pixelG/2;
-			//out.data[(row*out.step) + column * 3 + 2] = pixelR/2;
 			out.data[(row*out.step) + column * 3] = 0;
 			out.data[(row*out.step) + column * 3 + 1] = 0;
 			out.data[(row*out.step) + column * 3 + 2] = 0;
@@ -309,26 +302,14 @@ Mat track(Mat frame) {
 	//cudaMemcpy(d_newFrame, newFrame, sizeof(frame), cudaMemcpyHostToDevice);
 	getRedKernel << <blocks, threadCount >> > (d_outFrame, d_newFrame);
 	cudaDeviceSynchronize();
-	//Free newFrame device and host memory
-	//cudaFree(d_newFrame);
-	//free(newFrame);
-	//cudaMemcpy(outFrame, d_outFrame, sizeof(frame), cudaMemcpyDeviceToHost);
-	//Image dilation
-	//int erosionDilation_size = 5;
-	//Mat element = cv::getStructuringElement(MORPH_RECT, Size(2 * erosionDilation_size + 1, 2 * erosionDilation_size + 1));
-	//Ptr<cuda::Filter> dilateFilter = cv::cuda::createMorphologyFilter(MORPH_DILATE, d_outFrame.type(), element);
-	//dilateFilter->apply(d_outFrame, d_outFrame);
 
 	//Free original frame pointer device memory
 	cudaFree(d_imgPtr);
 	d_newFrame.release();
 
-
 	uint8_t *d_dilatedPtr;
 	cv::cuda::GpuMat d_dilatedFrame;
 	d_outFrame.copyTo(d_dilatedFrame);
-
-
 
 	//Allocate new device memory
 	cudaMalloc((void**)&d_dilatedPtr, d_dilatedFrame.rows*d_dilatedFrame.step);
@@ -374,9 +355,9 @@ Mat track(Mat frame) {
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 	cudaMemcpyAsync(d_trackedFramePtr, d_trackedFrame.ptr<uint8_t>(), d_trackedFrame.rows*d_trackedFrame.step, cudaMemcpyDeviceToDevice);
 
-	cudaMalloc((void**)&d_trackingLocations, (X/10) * (Y/10) * sizeof(int));
+	//cudaMalloc((void**)&d_trackingLocations, (X/10) * (Y/10) * sizeof(int));
+	cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
 	
-	//detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_trackingLocations, d_erodedFrame, d_copyFrame);
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_trackedFrame, d_erodedFrame, d_copyFrame);
 	cudaError_t error2 = cudaGetLastError();
 	if (error2 != cudaSuccess) {
@@ -384,7 +365,7 @@ Mat track(Mat frame) {
 	}
 	cudaDeviceSynchronize();
 
-	cudaMemcpy(trackingLocations, d_trackingLocations, (X/10) * (Y/10) * sizeof(int), cudaMemcpyDeviceToHost);
+	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
 	//printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 	//printf("%d %d %d %d\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 
@@ -420,13 +401,7 @@ Mat averageFrame(Mat buffer[3]) {
 		threadCount = X * Y;
 	}
 	
-	//copy buffer frames to device memory GpuMat
-	//cv::cuda::GpuMat d_bufferFrames[3];
-	//d_bufferFrames[0].upload(buffer[0]);
-	//d_bufferFrames[1].upload(buffer[1]);
-	//d_bufferFrames[2].upload(buffer[2]);
-	
-	
+	//copy buffer frames to device memory GpuMat	
 	//cv::cuda::PtrStepSz<float> *bufferPtr;
 	//cv::cuda::PtrStepSz<float> d_arr[3];
 	cv::cuda::PtrStepSz<uint8_t[3]> *bufferPtr;
