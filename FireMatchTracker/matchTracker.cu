@@ -276,17 +276,40 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 	}
 }
 
-int* getMatchLocation(std::set<int[2]>){
-	for i {
-		for j {
+int* getMatchLocation(std::set<int[2]> trackingLocations){
+	//for i {
+		//for j {
 			//if i != j
-			for k {
+			//for k {
 				//if i != k and j != k
 				//check dot product of vectors between i and j (a), and j and k (b)
 				//divided by the product of magnitudes of |a| and |b|, this should be close to 1
 				//work out magnitude of a and b, b should be approximately double a
 				//The one that is closest to 1 with b approximately double a is the correct match position
-			}
+			//}
+		//}
+	//}
+	double finalDotProduct = 0;	
+	double finalRatio;
+	//iterate over set to find all 3 location combinations, and find the most likely one to be the matchstick
+	for (auto i : trackingLocations) {
+		for (auto j : trackingLocations) {
+			if ((i[0] != j[0]) || (i[1] != j[1])) {
+				for (auto k : trackingLocations) {
+					if (((i[0] != k[0]) || (i[1] != k[1])) && ((j[0] != k[0]) || (j[1] != k[1]))) {
+						int a[2] = { j[0] - i[0], j[1] - i[1] };
+						int b[2] = { k[0] - j[0], k[1] - j[1] };
+						double aMagnitude = sqrt(a[0] * a[0] + a[1] * a[1]);
+						double bMagnitude = sqrt(b[0] * b[0] + b[1] * b[1]);
+						double dotProduct = sqrt(a[0] * b[0] + a[1] * b[1])/(aMagnitude * bMagnitude);
+						double ratio = bMagnitude/aMagnitude;
+						if (abs(1 - finalDotProduct) > abs(1 - dotProduct)) {
+							//test if ratio is close to 2, this does not have to be the closest to 2
+							//but instead should just be close enough, perhaps within a valid range
+						}
+					}
+				}
+			}			
 		}
 	}
 }
