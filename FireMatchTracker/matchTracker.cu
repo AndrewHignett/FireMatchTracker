@@ -276,6 +276,21 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 	}
 }
 
+int* getMatchLocation(std::set<int[2]>){
+	for i {
+		for j {
+			//if i != j
+			for k {
+				//if i != k and j != k
+				//check dot product of vectors between i and j (a), and j and k (b)
+				//divided by the product of magnitudes of |a| and |b|, this should be close to 1
+				//work out magnitude of a and b, b should be approximately double a
+				//The one that is closest to 1 with b approximately double a is the correct match position
+			}
+		}
+	}
+}
+
 Mat track(Mat frame) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
@@ -368,6 +383,7 @@ Mat track(Mat frame) {
 	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
 	//printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 	//printf("%d %d %d %d\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
+	print(trackingLocations);
 
 	//preventing memory leaks, in the wrong positon right now, purposely
 	free(trackingLocations);
