@@ -312,6 +312,8 @@ int* getMatchLocation(std::set<int[2]> trackingLocations){
 			}			
 		}
 	}
+	int temp[2] = { 0, 0 };
+	return temp;
 }
 
 Mat track(Mat frame) {
@@ -334,10 +336,6 @@ Mat track(Mat frame) {
 	cudaMalloc((void **)&d_outPtr, d_outFrame.rows*d_outFrame.step);
 	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
 	cudaMemcpyAsync(d_outPtr, d_outFrame.ptr<uint8_t>(), d_outFrame.rows*d_outFrame.step, cudaMemcpyDeviceToDevice);
-	//cudaMalloc((void**)&d_newFrame, sizeof(frame));
-	//cudaMalloc((void**)&d_outFrame, sizeof(frame));
-	//transfer memory from host to device memory
-	//cudaMemcpy(d_newFrame, newFrame, sizeof(frame), cudaMemcpyHostToDevice);
 	getRedKernel << <blocks, threadCount >> > (d_outFrame, d_newFrame);
 	cudaDeviceSynchronize();
 
@@ -378,7 +376,6 @@ Mat track(Mat frame) {
 
 	//int *trackingLocations = (int*)malloc((X/10)*(Y/10) * sizeof(int));
 	//int *d_trackingLocations;
-	//std::set<int[2], greater<int[2]>> *trackingLocations = (std::set<int[2]>)malloc(sizeof(std::set<int[2]>));
 	std::set<int[2], std::greater<int[2]>> *trackingLocations = (std::set<int[2], std::greater<int[2]>>*)malloc(2 * (X / 20)*(Y / 20) * sizeof(int));// = (std::set<int[2]>)malloc(sizeof(std::set<int[2]>));
 	std::set<int[2], std::greater<int[2]>> *d_trackingLocations;
 	uint8_t *d_copyFramePtr;
@@ -392,8 +389,6 @@ Mat track(Mat frame) {
 	cudaMalloc((void**)&d_trackedFramePtr, d_trackedFrame.rows*d_trackedFrame.step);
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 	cudaMemcpyAsync(d_trackedFramePtr, d_trackedFrame.ptr<uint8_t>(), d_trackedFrame.rows*d_trackedFrame.step, cudaMemcpyDeviceToDevice);
-
-	//cudaMalloc((void**)&d_trackingLocations, (X/10) * (Y/10) * sizeof(int));
 	cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_trackedFrame, d_erodedFrame, d_copyFrame);
@@ -404,8 +399,6 @@ Mat track(Mat frame) {
 	cudaDeviceSynchronize();
 
 	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
-	//printf("%u %u %u %u\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
-	//printf("%d %d %d %d\n", trackingLocations[0], trackingLocations[1], trackingLocations[2], trackingLocations[3]);
 	print(trackingLocations);
 
 	//preventing memory leaks, in the wrong positon right now, purposely
@@ -416,7 +409,6 @@ Mat track(Mat frame) {
 
 	Mat outFrame;
 	d_trackedFrame.download(outFrame);
-	//d_erodedFrame.download(outFrame);
 
 	//Free erodedFrame pointer device memory
 	cudaFree(d_erodedPtr);
