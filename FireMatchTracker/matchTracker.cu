@@ -272,44 +272,43 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 	}
 }
 
-int* getMatchLocation(std::set<int*> *trackingLocations){
-	//for i {
-		//for j {
-			//if i != j
-			//for k {
-				//if i != k and j != k
-				//check dot product of vectors between i and j (a), and j and k (b)
-				//divided by the product of magnitudes of |a| and |b|, this should be close to 1
-				//work out magnitude of a and b, b should be approximately double a
-				//The one that is closest to 1 with b approximately double a is the correct match position
-			//}
-		//}
-	//}
+//highlights the wrong location, always the lowest tracking dot on the match
+int* getMatchLocation(std::set<int> *trackingLocations){
 	double finalDotProduct = 0;	
 	double finalRatio;
+	//currently match tip is the red strip just below the tip
+	int matchTip[2] = { -1, -1 };
 	//iterate over set to find all 3 location combinations, and find the most likely one to be the matchstick
-	for (auto i : trackingLocations[0]) {
-		for (auto j : trackingLocations[0]) {
-			if ((i[0] != j[0]) || (i[1] != j[1])) {
-				for (auto k : trackingLocations[0]) {
-					if (((i[0] != k[0]) || (i[1] != k[1])) && ((j[0] != k[0]) || (j[1] != k[1]))) {
-						int a[2] = { j[0] - i[0], j[1] - i[1] };
-						int b[2] = { k[0] - j[0], k[1] - j[1] };
+	for (auto i : *trackingLocations) {
+		for (auto j : *trackingLocations) {
+			if (i != j) {
+				for (auto k : *trackingLocations) {
+					if ((i != k) && (j != k)) {
+						int trackA[2] = { i % X, i / X};
+						int trackB[2] = { j % X, j / X };
+						int trackC[2] = { k % X, k / X };
+						int a[2] = { trackB[0] - trackA[0], trackB[1] - trackA[1] };
+						int b[2] = { trackC[0] - trackB[0], trackC[1] - trackB[1] };
 						double aMagnitude = sqrt(a[0] * a[0] + a[1] * a[1]);
 						double bMagnitude = sqrt(b[0] * b[0] + b[1] * b[1]);
-						double dotProduct = sqrt(a[0] * b[0] + a[1] * b[1])/(aMagnitude * bMagnitude);
+						double dotProduct = (a[0] * b[0] + a[1] * b[1]) / (aMagnitude * bMagnitude);
 						double ratio = bMagnitude/aMagnitude;
 						if (abs(1 - finalDotProduct) > abs(1 - dotProduct)) {
 							//test if ratio is close to 2, this does not have to be the closest to 2
 							//but instead should just be close enough, perhaps within a valid range
+							if (1.35 < ratio < 1.65){
+								finalDotProduct = dotProduct;
+								finalRatio = ratio;
+								matchTip[0] = trackC[0];
+								matchTip[1] = trackC[1];
+							}
 						}
 					}
 				}
 			}			
 		}
 	}
-	int temp[2] = { 0, 0 };
-	return temp;
+	return matchTip;
 }
 
 Mat track(Mat frame) {
@@ -396,6 +395,10 @@ Mat track(Mat frame) {
 	}
 	cudaDeviceSynchronize();
 
+	//Free erodedFrame pointer device memory
+	cudaFree(d_erodedPtr);
+	d_erodedFrame.release();
+
 	//cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
 	//print(trackingLocations);
 
@@ -407,28 +410,32 @@ Mat track(Mat frame) {
 
 	Mat trackedFrame;
 	d_trackedFrame.download(trackedFrame);
-	std::set<int*> *trackingLocations = new std::set<int*>[2 * (X / 20)*(Y / 20)];
+	std::set<int> *trackingLocations = new std::set<int>[(X / 20)*(Y / 20)];
 	for (int i = 0; i < Y; i++) {
 		for (int j = 0; j < X; j++) {
 			if (trackedFrame.data[(i*trackedFrame.step) + j * 3 + 2] == 255) {
-				int thisPixel[2] = {j, i};
+				int thisPixel = i * X + j;
 				trackingLocations[0].insert(thisPixel);
 			}
 		}
 	}
-
-	getMatchLocation(trackingLocations);
-
+	
 	Mat outFrame;
 	d_trackedFrame.download(outFrame);
-
-	//Free erodedFrame pointer device memory
-	cudaFree(d_erodedPtr);
-	d_erodedFrame.release();
 
 	//Free the tracked frame from device memory
 	cudaFree(d_trackedFramePtr);
 	d_trackedFrame.release();
+
+	int *tip = getMatchLocation(trackingLocations);
+	if (tip[0] > -1) {
+		//printf("%d %d\n", tip[1], tip[0]);
+		outFrame.data[tip[1] * outFrame.step + tip[0] * 3 + 1] = 255;
+		outFrame.data[tip[1] * outFrame.step + tip[0] * 3 + 2] = 0;
+		outFrame.data[360 * outFrame.step + 640 * 3 + 1] = 255;
+	}
+
+	
 	
 	return outFrame;
 	//return *outFrame;

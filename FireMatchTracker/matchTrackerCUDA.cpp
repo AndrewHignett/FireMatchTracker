@@ -57,14 +57,14 @@ int main() {
 
 		//keep initial frame image as well as tracking overlay
 		Mat outFrame = track(frame);
-		updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
-		bufferedFrameCount++;
-		if (bufferedFrameCount > 2){
-			//averageFrame(frameBuffer).copyTo(outFrame);
-			imshow("frame", outFrame);
-			if (waitKey(30) >= 0) break;
-			waitKey(1);
-		}
+		//updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
+		//bufferedFrameCount++;
+		//if (bufferedFrameCount > 2){
+		//averageFrame(frameBuffer).copyTo(outFrame);
+		imshow("frame", outFrame);
+		if (waitKey(30) >= 0) break;
+		waitKey(1);
+		//}
 	}
 	destroyAllWindows();
 	return 0;
