@@ -56,7 +56,8 @@ __global__ void averageKernel(cv::cuda::GpuMat out, cv::cuda::PtrStepSz<uint8_t[
 }
 
 //store the length of trackingLocations in shared memory, then sync threads and store it in trackingLocations[0];
-__global__ void detectObjectKernel(std::set<int[2]> trackingLocations, cv::cuda::GpuMat trackedFrame, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)//, int *a , cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)int *trackingLocations, 
+//could try putting the set in here instead of needing to loop through the frame after, this would also mean the tracked frame is not neededs
+__global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuMat cleanFrame, cv::cuda::GpuMat frameCopy)
 {
 	//detect object size here
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -145,18 +146,13 @@ __global__ void detectObjectKernel(std::set<int[2]> trackingLocations, cv::cuda:
 			int centreX = (maxX - minX) / 2 + minX;
 			int centreY = (maxY - minY) / 2 + minY;
 			trackedFrame.data[(centreY*trackedFrame.step) + centreX * 3 + 2] = 255;
-			//trackedFrame.data[(maxY*trackedFrame.step) + maxX * 3 + 2] = 255;
-			//trackedFrame.data[(maxY*trackedFrame.step) + minX * 3 + 2] = 255;
-			//trackedFrame.data[(minY*trackedFrame.step) + maxX * 3 + 2] = 255;
-			//trackedFrame.data[(minY*trackedFrame.step) + minX * 3 + 2] = 255;
 			//trackingLocations[1 + threadId/100] = centreX;
-			trackingLocations.insert({ centreX, centreY });
+			//trackingLocations[0].insert({ centreX, centreY });
 			//trackingLocations[2 + threadId/100] = centreY;
 
 		}
 	}
-	__syncthreads();
-	//list length includes repeated tracking locations
+	//__syncthreads();
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -276,7 +272,7 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 	}
 }
 
-int* getMatchLocation(std::set<int[2]> trackingLocations){
+int* getMatchLocation(std::set<int*> *trackingLocations){
 	//for i {
 		//for j {
 			//if i != j
@@ -292,10 +288,10 @@ int* getMatchLocation(std::set<int[2]> trackingLocations){
 	double finalDotProduct = 0;	
 	double finalRatio;
 	//iterate over set to find all 3 location combinations, and find the most likely one to be the matchstick
-	for (auto i : trackingLocations) {
-		for (auto j : trackingLocations) {
+	for (auto i : trackingLocations[0]) {
+		for (auto j : trackingLocations[0]) {
 			if ((i[0] != j[0]) || (i[1] != j[1])) {
-				for (auto k : trackingLocations) {
+				for (auto k : trackingLocations[0]) {
 					if (((i[0] != k[0]) || (i[1] != k[1])) && ((j[0] != k[0]) || (j[1] != k[1]))) {
 						int a[2] = { j[0] - i[0], j[1] - i[1] };
 						int b[2] = { k[0] - j[0], k[1] - j[1] };
@@ -376,8 +372,10 @@ Mat track(Mat frame) {
 
 	//int *trackingLocations = (int*)malloc((X/10)*(Y/10) * sizeof(int));
 	//int *d_trackingLocations;
-	std::set<int[2], std::greater<int[2]>> *trackingLocations = (std::set<int[2], std::greater<int[2]>>*)malloc(2 * (X / 20)*(Y / 20) * sizeof(int));// = (std::set<int[2]>)malloc(sizeof(std::set<int[2]>));
-	std::set<int[2], std::greater<int[2]>> *d_trackingLocations;
+	//std::set<int[2], std::greater<int[2]>> *trackingLocations = (std::set<int[2], std::greater<int[2]>>*)malloc(2 * (X / 20)*(Y / 20) * sizeof(int));// = (std::set<int[2]>)malloc(sizeof(std::set<int[2]>));
+	//std::set<int[2]> *trackingLocations = (std::set<int[2]>*)malloc(2 * (X / 20)*(Y / 20) * sizeof(int));
+	//std::set<int[2], std::greater<int[2]>> *d_trackingLocations;
+	//std::set<int[2]> *d_trackingLocations;
 	uint8_t *d_copyFramePtr;
 	cv::cuda::GpuMat d_copyFrame;
 	uint8_t *d_trackedFramePtr;
@@ -389,23 +387,37 @@ Mat track(Mat frame) {
 	cudaMalloc((void**)&d_trackedFramePtr, d_trackedFrame.rows*d_trackedFrame.step);
 	cudaMemcpyAsync(d_copyFramePtr, d_copyFrame.ptr<uint8_t>(), d_copyFrame.rows*d_copyFrame.step, cudaMemcpyDeviceToDevice);
 	cudaMemcpyAsync(d_trackedFramePtr, d_trackedFrame.ptr<uint8_t>(), d_trackedFrame.rows*d_trackedFrame.step, cudaMemcpyDeviceToDevice);
-	cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
+	//cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
 	
-	detectObjectKernel<<<blocks, threadCount>>>(d_trackingLocations, d_trackedFrame, d_erodedFrame, d_copyFrame);
+	detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_erodedFrame, d_copyFrame);
 	cudaError_t error2 = cudaGetLastError();
 	if (error2 != cudaSuccess) {
 		printf("2. Error: %s\n", cudaGetErrorString(error2));
 	}
 	cudaDeviceSynchronize();
 
-	cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
-	print(trackingLocations);
+	//cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
+	//print(trackingLocations);
 
 	//preventing memory leaks, in the wrong positon right now, purposely
-	free(trackingLocations);
-	cudaFree(d_trackingLocations);
+	//free(trackingLocations);
+	//cudaFree(d_trackingLocations);
 	cudaFree(d_copyFramePtr);
 	d_copyFrame.release();
+
+	Mat trackedFrame;
+	d_trackedFrame.download(trackedFrame);
+	std::set<int*> *trackingLocations = new std::set<int*>[2 * (X / 20)*(Y / 20)];
+	for (int i = 0; i < Y; i++) {
+		for (int j = 0; j < X; j++) {
+			if (trackedFrame.data[(i*trackedFrame.step) + j * 3 + 2] == 255) {
+				int thisPixel[2] = {j, i};
+				trackingLocations[0].insert(thisPixel);
+			}
+		}
+	}
+
+	getMatchLocation(trackingLocations);
 
 	Mat outFrame;
 	d_trackedFrame.download(outFrame);
