@@ -272,35 +272,46 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 	}
 }
 
-//highlights the wrong location, always the lowest tracking dot on the match
+
 int* getMatchLocation(std::set<int> *trackingLocations){
-	double finalDotProduct = 0;	
-	double finalRatio;
-	//currently match tip is the red strip just below the tip
-	int matchTip[2] = { -1, -1 };
+	int *matchTip = (int*)malloc(2 * sizeof(int));
+	matchTip[0] =  -1;
+	matchTip[1] = -1;
+	int trackA[2];
+	int trackB[2];
+	int trackC[2];
+	int a[2];
+	int b[2];
+	double aMagnitude;
+	double bMagnitude;
+	double ratio;
+	double dotProduct;
 	//iterate over set to find all 3 location combinations, and find the most likely one to be the matchstick
 	for (auto i : *trackingLocations) {
 		for (auto j : *trackingLocations) {
 			if (i != j) {
 				for (auto k : *trackingLocations) {
 					if ((i != k) && (j != k)) {
-						int trackA[2] = { i % X, i / X};
-						int trackB[2] = { j % X, j / X };
-						int trackC[2] = { k % X, k / X };
-						int a[2] = { trackB[0] - trackA[0], trackB[1] - trackA[1] };
-						int b[2] = { trackC[0] - trackB[0], trackC[1] - trackB[1] };
-						double aMagnitude = sqrt(a[0] * a[0] + a[1] * a[1]);
-						double bMagnitude = sqrt(b[0] * b[0] + b[1] * b[1]);
-						double dotProduct = (a[0] * b[0] + a[1] * b[1]) / (aMagnitude * bMagnitude);
-						double ratio = bMagnitude/aMagnitude;
-						if (abs(1 - finalDotProduct) > abs(1 - dotProduct)) {
-							//test if ratio is close to 2, this does not have to be the closest to 2
-							//but instead should just be close enough, perhaps within a valid range
-							if (1.35 < ratio < 1.65){
-								finalDotProduct = dotProduct;
-								finalRatio = ratio;
-								matchTip[0] = trackC[0];
-								matchTip[1] = trackC[1];
+						trackA[0] = i % X;
+						trackA[1] = i / X;
+						trackB[0] = j % X;
+						trackB[1] = j / X;
+						trackC[0] = k % X;
+						trackC[1] = k / X;
+						a[0] = trackB[0] - trackA[0];
+						a[1] = trackB[1] - trackA[1];
+						b[0] = trackC[0] - trackB[0];
+						b[1] = trackC[1] - trackB[1];
+						aMagnitude = sqrt(a[0] * a[0] + a[1] * a[1]);
+						bMagnitude = sqrt(b[0] * b[0] + b[1] * b[1]);
+						dotProduct = (a[0] * b[0] + a[1] * b[1]) / (aMagnitude * bMagnitude);
+						ratio = bMagnitude/aMagnitude;	
+						if (dotProduct > 0.99) {
+							//test if ratio is close to 1.5
+							if ((1.35 < ratio) && (ratio < 1.65)){
+								memcpy(matchTip, trackC, sizeof(int)*2);
+								matchTip[0] += b[0] / 10;
+								matchTip[1] += b[1] / 10;
 							}
 						}
 					}
@@ -420,24 +431,47 @@ Mat track(Mat frame) {
 		}
 	}
 	
-	Mat outFrame;
-	d_trackedFrame.download(outFrame);
+	//Mat outFrame;
+	//d_trackedFrame.download(outFrame);
 
 	//Free the tracked frame from device memory
 	cudaFree(d_trackedFramePtr);
 	d_trackedFrame.release();
 
 	int *tip = getMatchLocation(trackingLocations);
-	if (tip[0] > -1) {
-		//printf("%d %d\n", tip[1], tip[0]);
-		outFrame.data[tip[1] * outFrame.step + tip[0] * 3 + 1] = 255;
-		outFrame.data[tip[1] * outFrame.step + tip[0] * 3 + 2] = 0;
-		outFrame.data[360 * outFrame.step + 640 * 3 + 1] = 255;
+	if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
+		frame.data[tip[1] * frame.step + tip[0] * 3] = 0;
+		frame.data[tip[1] * frame.step + tip[0] * 3 + 1] = 255;
+		frame.data[tip[1] * frame.step + tip[0] * 3 + 2] = 0;
+		frame.data[(tip[1] + 1) * frame.step + tip[0] * 3] = 0;
+		frame.data[(tip[1] + 1) * frame.step + tip[0] * 3 + 1] = 255;
+		frame.data[(tip[1] + 1) * frame.step + tip[0] * 3 + 2] = 0;
+		frame.data[(tip[1] - 1) * frame.step + tip[0] * 3] = 0;
+		frame.data[(tip[1] - 1) * frame.step + tip[0] * 3 + 1] = 255;
+		frame.data[(tip[1] - 1) * frame.step + tip[0] * 3 + 2] = 0;
+		frame.data[tip[1] * frame.step + (tip[0] + 1) * 3] = 0;
+		frame.data[tip[1] * frame.step + (tip[0] + 1) * 3 + 1] = 255;
+		frame.data[tip[1] * frame.step + (tip[0] + 1) * 3 + 2] = 0;
+		frame.data[(tip[1] + 1) * frame.step + (tip[0] + 1) * 3] = 0;
+		frame.data[(tip[1] + 1) * frame.step + (tip[0] + 1) * 3 + 1] = 255;
+		frame.data[(tip[1] + 1) * frame.step + (tip[0] + 1) * 3 + 2] = 0;
+		frame.data[(tip[1] - 1) * frame.step + (tip[0] + 1) * 3] = 0;
+		frame.data[(tip[1] - 1) * frame.step + (tip[0] + 1) * 3 + 1] = 255;
+		frame.data[(tip[1] - 1) * frame.step + (tip[0] + 1) * 3 + 2] = 0;
+		frame.data[tip[1] * frame.step + (tip[0] - 1) * 3] = 0;
+		frame.data[tip[1] * frame.step + (tip[0] - 1) * 3 + 1] = 255;
+		frame.data[tip[1] * frame.step + (tip[0] - 1) * 3 + 2] = 0;
+		frame.data[(tip[1] + 1) * frame.step + (tip[0] - 1) * 3] = 0;
+		frame.data[(tip[1] + 1) * frame.step + (tip[0] - 1) * 3 + 1] = 255;
+		frame.data[(tip[1] + 1) * frame.step + (tip[0] - 1) * 3 + 2] = 0;
+		frame.data[(tip[1] - 1) * frame.step + (tip[0] - 1) * 3] = 0;
+		frame.data[(tip[1] - 1) * frame.step + (tip[0] - 1) * 3 + 1] = 255;
+		frame.data[(tip[1] - 1) * frame.step + (tip[0] - 1) * 3 + 2] = 0;
 	}
 
 	
 	
-	return outFrame;
+	//return outFrame;
 	//return *outFrame;
 	//For the sake of debugging 
 	return frame;
