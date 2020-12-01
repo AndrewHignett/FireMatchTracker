@@ -1,6 +1,7 @@
 #pragma once
 #include <opencv2/core.hpp>
 using namespace cv;
+#include <glew.h>
 #include <glfw3.h>
 
 #ifndef _matchTracker_

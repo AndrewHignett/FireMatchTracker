@@ -9,6 +9,10 @@ using namespace std;
 using namespace cv::cuda;
 #include "matchTracker.h"
 
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 720
+#define WINDOW_TITLE "Window"
+
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {
 		Mat temp1, temp2;
@@ -26,6 +30,20 @@ void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 }
 
 int main(int argc, char** argv) {
+	//test window setup
+	glfwInit();
+	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+	glfwMakeContextCurrent(window);
+	glewExperimental = GL_TRUE;
+
+	if (glewInit() != GLEW_OK) {
+		//error with initialisation
+		glfwTerminate();
+	}
+
+	//try to have a particle effect on a transparent background and then apply to each frame
+	
+
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
 	int cuda_devices_number = getCudaEnabledDeviceCount();
