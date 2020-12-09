@@ -12,6 +12,7 @@ using namespace cv::cuda;
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 
+//For the flame setup
 struct Particle {
 	vec4 Position;
 	vec4 velocity;
