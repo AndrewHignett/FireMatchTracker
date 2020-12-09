@@ -12,6 +12,12 @@ using namespace cv::cuda;
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 
+struct Particle {
+	vec4 Position;
+	vec4 velocity;
+	vec4 Color;
+};
+
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {
 		Mat temp1, temp2;
