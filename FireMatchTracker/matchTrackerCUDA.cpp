@@ -1,6 +1,5 @@
 #include <iostream>
 #include <stdio.h>
-//#include <gl/glut.h>
 #include <opencv2/cudaimgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
@@ -12,6 +11,13 @@ using namespace cv::cuda;
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
+
+//For the flame setup
+struct Particle {
+	vec4 Position;
+	vec4 velocity;
+	vec4 Color;
+};
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {
@@ -26,7 +32,7 @@ void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 		printf("%d\n", currentSize);
 		buffer[currentSize] = newFrame;
 	}
-	
+
 }
 
 int main(int argc, char** argv) {
@@ -42,7 +48,7 @@ int main(int argc, char** argv) {
 	}
 
 	//try to have a particle effect on a transparent background and then apply to each frame
-	
+
 
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
