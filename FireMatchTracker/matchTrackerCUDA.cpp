@@ -14,9 +14,9 @@ using namespace cv::cuda;
 
 //For the flame setup
 struct Particle {
-	vec4 Position;
-	vec4 velocity;
-	vec4 Color;
+	glm::vec4 Position;
+	glm::vec4 velocity;
+	glm::vec4 Color;
 };
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
