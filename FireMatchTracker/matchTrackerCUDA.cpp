@@ -12,12 +12,36 @@ using namespace cv::cuda;
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 
+GLuint uiVAOid, uiVBOid, m_vboID[3];
+
 //For the flame setup
 struct Particle {
 	glm::vec4 Position;
 	glm::vec4 velocity;
 	glm::vec4 Color;
 };
+
+//initial scene setup for opengl, not in a state where it's complete
+void initScene() {
+	float fVert[9];
+	fVert[0] = -5;
+	fVert[1] = 0;
+	fVert[2] = 0;
+	fVert[3] = 5;
+	fVert[4] = 0;
+	fVert[5] = 0;
+	fVert[6] = 0;
+	fVert[7] = 5;
+	fVert[8] = 0;
+	//Generate vertex array object
+	glGenVertexArrays(1, &uiVAOid);
+	//Setup of vertex array object
+	glBindVertexArray(uiVAOid);
+
+	glGenBuffers(1, m_vboID);
+
+	glBindBuffer(GL_ARRAY_BUFFER, m_vboID[0]);
+}
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {
@@ -48,8 +72,7 @@ int main(int argc, char** argv) {
 	}
 
 	//try to have a particle effect on a transparent background and then apply to each frame
-
-
+	
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
 	int cuda_devices_number = getCudaEnabledDeviceCount();
