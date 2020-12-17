@@ -11,28 +11,30 @@ using namespace cv::cuda;
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
+const int MaxParticles = 100000;
+Particle ParticlesContainer[MaxParticles];
 
+//might be unnecessary variables
 GLuint uiVAOid, uiVBOid, m_vboID[3];
 
 //For the flame setup
+//Particle definition
 struct Particle {
-	glm::vec4 Position;
-	glm::vec4 velocity;
-	glm::vec4 Color;
+	//glm::vec4 Position;
+	//glm::vec4 velocity;
+	//glm::vec4 Color;
+	glm::vec3 position, velocity;
+	unsigned char r, g, b, a; //colour and alpha
+	float size, angle, weight;
+	float life; //remaining life of the particle. Dead and unused if < 0
 };
 
 //initial scene setup for opengl, not in a state where it's complete
 void initScene() {
 	float fVert[9];
-	fVert[0] = -5;
-	fVert[1] = 0;
-	fVert[2] = 0;
-	fVert[3] = 5;
-	fVert[4] = 0;
-	fVert[5] = 0;
-	fVert[6] = 0;
-	fVert[7] = 5;
-	fVert[8] = 0;
+	fVert[0] = -5; fVert[1] = 0; fVert[2] = 0;
+	fVert[3] = 5; fVert[4] = 0; fVert[5] = 0;
+	fVert[6] = 0; fVert[7] = 5; fVert[8] = 0;
 	//Generate vertex array object
 	glGenVertexArrays(1, &uiVAOid);
 	//Setup of vertex array object
@@ -73,6 +75,18 @@ int main(int argc, char** argv) {
 
 	//try to have a particle effect on a transparent background and then apply to each frame
 	
+	//testing openGL particle generation, initial attempt while learning
+	static const GLfloat g_vertex_buffer_data[] = {
+	-0.5f, -0.5f, 0.0f,
+	0.5f, -0.5f, 0.0f,
+	-0.5f, 0.5f, 0.0f,
+	0.5f, 0.5f, 0.0f
+	};
+	GLuint billboard_vertex_buffer;
+	glGenBuffers(1, &billboard_vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
+
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
 	int cuda_devices_number = getCudaEnabledDeviceCount();
