@@ -12,37 +12,71 @@ using namespace cv::cuda;
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 const int MaxParticles = 100000;
-Particle ParticlesContainer[MaxParticles];
+Particle ParticleContainer[MaxParticles];
+int LastUsedParticle = 0;
 
-//might be unnecessary variables
-GLuint uiVAOid, uiVBOid, m_vboID[3];
 
 //For the flame setup
 //Particle definition
-struct Particle {
+class Particle {
 	//glm::vec4 Position;
 	//glm::vec4 velocity;
 	//glm::vec4 Color;
-	glm::vec3 position, velocity;
+	glm::vec3 position, velocity, acceleration;
 	unsigned char r, g, b, a; //colour and alpha
 	float size, angle, weight;
 	float life; //remaining life of the particle. Dead and unused if < 0
+public:
+	void setValues(glm::vec3, glm::vec3, glm::vec3, unsigned char[4], float, float, float, float);
+	void updateParticle(float);
 };
 
-//initial scene setup for opengl, not in a state where it's complete
-void initScene() {
-	float fVert[9];
-	fVert[0] = -5; fVert[1] = 0; fVert[2] = 0;
-	fVert[3] = 5; fVert[4] = 0; fVert[5] = 0;
-	fVert[6] = 0; fVert[7] = 5; fVert[8] = 0;
-	//Generate vertex array object
-	glGenVertexArrays(1, &uiVAOid);
-	//Setup of vertex array object
-	glBindVertexArray(uiVAOid);
+void Particle::setValues(glm::vec3 pos, glm::vec3 vel, glm::vec3 acc, unsigned char colour[4], float sizeI, float angleI, float weightI, float lifeI) {
+	position = pos;
+	velocity = vel;
+	acceleration = acc;
+	r = colour[0];
+	g = colour[1];
+	b = colour[2];
+	a = colour[3];
+	size = sizeI;
+	angle = angleI;
+	weight = weightI;
+	life = lifeI;
+}
 
-	glGenBuffers(1, m_vboID);
+//Update the state parameters of the particle based off it's acceleration, initial velocity and position
+void Particle::updateParticle(float deltaT) {
+	//update the values for this particle
+	//postion =
+	//velocity =
+	//acceleration =
+	//life = 
+	//Later, update colour based roughly off life span to emulate smoke or edge colouring of the fire
+}
 
-	glBindBuffer(GL_ARRAY_BUFFER, m_vboID[0]);
+//class container for the particle system, may be unnecessary
+class ParticleSystem {
+
+};
+
+//code intended for opengl use
+int findUnusedParticle() {
+	for (int i = LastUsedParticle; i < MaxParticles; i++) {
+		if (ParticleContainer[i].life < 0) {
+			LastUsedParticle = i;
+			return i;
+		}
+	}
+
+	for (int i = 0; i < LastUsedParticle; i++) {
+		if (ParticleContainer[i].life < 0) {
+			LastUsedParticle = i;
+			return i;
+		}
+	}
+
+	return 0; //all particles are taken
 }
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
@@ -63,29 +97,17 @@ void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 
 int main(int argc, char** argv) {
 	//test window setup
-	glfwInit();
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
-	glfwMakeContextCurrent(window);
-	glewExperimental = GL_TRUE;
+	//glfwInit();
+	//GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+	//glfwMakeContextCurrent(window);
+	//glewExperimental = GL_TRUE;
 
-	if (glewInit() != GLEW_OK) {
+	//if (glewInit() != GLEW_OK) {
 		//error with initialisation
-		glfwTerminate();
-	}
+		//glfwTerminate();
+	//}
 
 	//try to have a particle effect on a transparent background and then apply to each frame
-	
-	//testing openGL particle generation, initial attempt while learning
-	static const GLfloat g_vertex_buffer_data[] = {
-	-0.5f, -0.5f, 0.0f,
-	0.5f, -0.5f, 0.0f,
-	-0.5f, 0.5f, 0.0f,
-	0.5f, 0.5f, 0.0f
-	};
-	GLuint billboard_vertex_buffer;
-	glGenBuffers(1, &billboard_vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, billboard_vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
