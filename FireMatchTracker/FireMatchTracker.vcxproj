@@ -86,6 +86,7 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <CudaCompile Include="FlameParticles.cu" />
     <CudaCompile Include="matchTracker.cu" />
   </ItemGroup>
   <ItemGroup>
