@@ -15,4 +15,5 @@ using namespace cv;
 #define _matchTracker_
 Mat track(Mat frame);
 Mat averageFrame(Mat buffer[3]);
+Mat addFlame(Mat frame, int matchTip[2]);
 #endif

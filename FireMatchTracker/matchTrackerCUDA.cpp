@@ -7,10 +7,13 @@ using namespace std;
 #include <opencv2/cudaarithm.hpp>
 using namespace cv::cuda;
 #include "matchTracker.h"
+#include "Particle.h"
 
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
+const int MaxParticles = 10000;
+Particle ParticleContainer[MaxParticles];
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {

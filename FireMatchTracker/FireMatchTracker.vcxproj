@@ -95,6 +95,7 @@
   <ItemGroup>
     <ClInclude Include="glut.h" />
     <ClInclude Include="matchTracker.h" />
+    <ClInclude Include="Particle.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
