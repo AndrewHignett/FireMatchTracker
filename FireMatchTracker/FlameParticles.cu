@@ -1,9 +1,9 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include "matchTracker.h"
+#include "Particle.h"
 
-int LastUsedParticle = 0;
-
+__host__ __device__
 void Particle::setValues(glm::vec3 pos, glm::vec3 vel, unsigned char colour[4], float sizeI, float angleI, float weightI, float lifeI) {
 	position = pos;
 	velocity = vel;
@@ -21,6 +21,7 @@ void Particle::setValues(glm::vec3 pos, glm::vec3 vel, unsigned char colour[4], 
 }
 
 //Update the state parameters of the particle based off it's acceleration, initial velocity and position
+__host__ __device__
 void Particle::updateParticle(float deltaT) {
 	//update the values for this particle
 	//postion =
@@ -34,6 +35,20 @@ void Particle::updateParticle(float deltaT) {
 	//if the life is above the particle lifespan, then remove particle by resetting start inital particle attributes
 }
 
-Mat addFlame(Mat frame, int matchTip[2]) {
+Mat addFlame(Mat frame, int matchTip[2], Particle container[], int maxParticles) {
+
+}
+
+__global__ void particleKernel(Particle container[], int maxParticles){
+
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < maxParticles)
+	{
+
+	}
+}
+
+//update the particle postions and return the new positions, before adding the flame to the frame
+Particle *updateParticles(float deltaT, Particle container[], int maxParticles) {
 
 }

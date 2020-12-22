@@ -322,7 +322,10 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 	return matchTip;
 }
 
-Mat track(Mat frame) {
+
+//any reference to editing the final frame can be removed
+//Mat track(Mat frame) {
+int* track(Mat frame) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
 	if (blocks == 1)
@@ -470,11 +473,11 @@ Mat track(Mat frame) {
 	}
 
 	
-	
+	return tip;
 	//return outFrame;
 	//return *outFrame;
 	//For the sake of debugging 
-	return frame;
+	//return frame;
 }
 
 Mat averageFrame(Mat buffer[3]) {

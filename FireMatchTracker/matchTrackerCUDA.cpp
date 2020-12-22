@@ -13,6 +13,7 @@ using namespace cv::cuda;
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 const int MaxParticles = 10000;
+const float FrameTime = 0.033;
 Particle ParticleContainer[MaxParticles];
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
@@ -76,12 +77,16 @@ int main(int argc, char** argv) {
 		//Type is CV_U8 = unsigned char
 
 		//keep initial frame image as well as tracking overlay
-		Mat outFrame = track(frame);
+		//Mat outFrame = track(frame);
+		int* trackingLocation = track(frame);
 		//updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
 		//bufferedFrameCount++;
 		//if (bufferedFrameCount > 2){
 		//averageFrame(frameBuffer).copyTo(outFrame);
-		imshow("frame", outFrame);
+		//imshow("frame", outFrame);
+		Particle *ParticleContainer = updateParticles(FrameTime, ParticleContainer, MaxParticles);
+		Mat flameFrame = addFlame(frame, trackingLocation, ParticleContainer, MaxParticles);
+		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 		//}
