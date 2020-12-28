@@ -14,6 +14,9 @@ using namespace cv::cuda;
 #define WINDOW_TITLE "Window"
 const int MaxParticles = 10000;
 const float FrameTime = 0.033;
+const int emissionsPerFrame = 100;
+//should be variable based on distance
+int matchWidth = 20;
 Particle ParticleContainer[MaxParticles];
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {

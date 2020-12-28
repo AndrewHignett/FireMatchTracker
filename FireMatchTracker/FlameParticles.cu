@@ -50,5 +50,15 @@ __global__ void particleKernel(Particle container[], int maxParticles){
 
 //update the particle postions and return the new positions, before adding the flame to the frame
 Particle *updateParticles(float deltaT, Particle container[], int maxParticles) {
-
+	//add a new number of particles based on the emmissions per frame
+	//max out at maxParticles
+	//it's possible for particles to be removed, as they time out
+	//we need a way to check if a particle is in use quickly so that particles can be overwritten
+	//with new particles. The particle's age can act as this.
+	//We can update a given number of known particles, so that they can be made visible
+	//The particles would need to be sorted by age, or at the very least, guarenteed that the first
+	//"emmisions per frame" particles are innactive
+	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
+	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
+	//easier
 }

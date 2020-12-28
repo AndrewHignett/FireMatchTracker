@@ -23,7 +23,10 @@ public:
 
 //class container for the particle system, may be unnecessary
 class ParticleSystem {
-
+	int width;
+	int particleCount;
+	//Particle *flameParticles;
+	int emmissionsPerFrame;
 };
 
 Particle *updateParticles(float deltaT, Particle container[], int maxParticles);
