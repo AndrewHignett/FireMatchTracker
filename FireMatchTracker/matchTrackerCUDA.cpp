@@ -17,7 +17,12 @@ const float FrameTime = 0.033;
 const int emissionsPerFrame = 100;
 //should be variable based on distance
 int matchWidth = 20;
-Particle ParticleContainer[MaxParticles];
+
+//Untseted approach to a quicksort
+bool operator<(Particle& x, Particle& y)
+{
+	return x.getLife() < y.getLife();
+}
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {
@@ -65,6 +70,17 @@ int main(int argc, char** argv) {
 
 	int bufferedFrameCount = 0;
 	Mat *frameBuffer = new Mat[3];
+	Particle *ParticleContainer[MaxParticles];
+	//access violation need to be malloced
+	glm::vec3 pos = { 0.0f, 0.0f, 0.0f };
+	glm::vec3 vel = { 0.0f, 0.0f, 0.0f };
+	unsigned char colour[4] = { 0, 0, 0, 0 };
+	float size = 1;
+	//angle and weight may be unnessecary for this particle system
+	float angle = 0;
+	float weight = 1;
+	float life = 0;
+	ParticleContainer[0]->setValues(pos, vel, colour, size, angle, weight, life);
 	namedWindow("frame", 1);
 	for (;;)
 	{
@@ -87,7 +103,10 @@ int main(int argc, char** argv) {
 		//if (bufferedFrameCount > 2){
 		//averageFrame(frameBuffer).copyTo(outFrame);
 		//imshow("frame", outFrame);
-		Particle *ParticleContainer = updateParticles(FrameTime, ParticleContainer, MaxParticles);
+		//Sort the particle list
+		std::sort(ParticleContainer, ParticleContainer + MaxParticles);
+		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
+		Particle *ParticleContainer = updateParticles(FrameTime, ParticleContainer, MaxParticles, emissionsPerFrame);
 		Mat flameFrame = addFlame(frame, trackingLocation, ParticleContainer, MaxParticles);
 		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;

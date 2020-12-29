@@ -10,6 +10,7 @@ using namespace cv;
 #include <mat4x4.hpp>
 #include <gtc\matrix_transform.hpp>
 #include <gtc\type_ptr.hpp>
+#include <algorithm>
 
 #ifndef _matchTracker_
 #define _matchTracker_

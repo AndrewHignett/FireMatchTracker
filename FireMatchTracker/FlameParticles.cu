@@ -17,6 +17,8 @@ void Particle::setValues(glm::vec3 pos, glm::vec3 vel, unsigned char colour[4], 
 	angle = angleI;
 	weight = weightI;
 	//particle life span must be longer as the particle's initial location approaches the match tracked location
+	//life starts as a number (e.g. 4), and the particle is inactive when it's <= 0
+	//all particles should be initialised to a life of 0
 	life = lifeI;
 }
 
@@ -35,21 +37,30 @@ void Particle::updateParticle(float deltaT) {
 	//if the life is above the particle lifespan, then remove particle by resetting start inital particle attributes
 }
 
-Mat addFlame(Mat frame, int matchTip[2], Particle container[], int maxParticles) {
-
+Mat addFlame(Mat frame, int matchTip[2], Particle *container, int maxParticles) {
+	//for debug only
+	return frame;
 }
 
-__global__ void particleKernel(Particle container[], int maxParticles){
+__global__ void particleKernel(Particle *container, int maxParticles, int emissionsPerFrame){
 
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < maxParticles)
 	{
-
+		if (container[threadId].getLife() > 0) {
+			//update active particles
+			//some may be reduced to a life below 0
+		}
+		else if (threadId < emissionsPerFrame) {
+			//inactive particles, all will have a life <= 0
+			//update these particles as new particles
+			//it's possible this may be less than the number of emmissions per frame and that there still may be remaining inactive particles
+		}
 	}
 }
 
 //update the particle postions and return the new positions, before adding the flame to the frame
-Particle *updateParticles(float deltaT, Particle container[], int maxParticles) {
+Particle *updateParticles(float deltaT, Particle *container, int maxParticles, int emissionsPerFrame) {
 	//add a new number of particles based on the emmissions per frame
 	//max out at maxParticles
 	//it's possible for particles to be removed, as they time out
@@ -61,4 +72,7 @@ Particle *updateParticles(float deltaT, Particle container[], int maxParticles) 
 	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
 	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
 	//easier
+
+	//for debug only
+	return container;
 }

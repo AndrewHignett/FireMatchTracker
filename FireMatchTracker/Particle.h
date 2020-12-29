@@ -19,6 +19,8 @@ public:
 	void setValues(glm::vec3, glm::vec3, unsigned char[4], float, float, float, float);
 	__host__ __device__
 	void updateParticle(float);
+	__host__ __device__
+	float getLife() { return life; };
 };
 
 //class container for the particle system, may be unnecessary
@@ -29,6 +31,6 @@ class ParticleSystem {
 	int emmissionsPerFrame;
 };
 
-Particle *updateParticles(float deltaT, Particle container[], int maxParticles);
-Mat addFlame(Mat frame, int matchTip[2], Particle container[], int maxParticles);
+Particle *updateParticles(float deltaT, Particle *container, int maxParticles, int emissionsPerFrame);
+Mat addFlame(Mat frame, int matchTip[2], Particle *container, int maxParticles);
 #endif
