@@ -70,17 +70,19 @@ int main(int argc, char** argv) {
 
 	int bufferedFrameCount = 0;
 	Mat *frameBuffer = new Mat[3];
-	Particle *ParticleContainer[MaxParticles];
+	Particle ParticleContainer[MaxParticles];
 	//access violation need to be malloced
-	glm::vec3 pos = { 0.0f, 0.0f, 0.0f };
-	glm::vec3 vel = { 0.0f, 0.0f, 0.0f };
+	//glm::vec3 pos = { 0.0f, 0.0f, 0.0f };
+	//glm::vec3 vel = { 0.0f, 0.0f, 0.0f };
+	float pos[3] = { 0.0, 0.0, 0.0 };
+	float vel[3] = { 0.0, 0.0, 0.0 };
 	unsigned char colour[4] = { 0, 0, 0, 0 };
 	float size = 1;
 	//angle and weight may be unnessecary for this particle system
 	float angle = 0;
 	float weight = 1;
 	float life = 0;
-	ParticleContainer[0]->setValues(pos, vel, colour, size, angle, weight, life);
+	*ParticleContainer = *initialSetValues(ParticleContainer, MaxParticles, pos, vel, colour, size, angle, weight, life);
 	namedWindow("frame", 1);
 	for (;;)
 	{
@@ -106,7 +108,7 @@ int main(int argc, char** argv) {
 		//Sort the particle list
 		std::sort(ParticleContainer, ParticleContainer + MaxParticles);
 		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
-		Particle *ParticleContainer = updateParticles(FrameTime, ParticleContainer, MaxParticles, emissionsPerFrame);
+		*ParticleContainer = *updateParticles(FrameTime, ParticleContainer, MaxParticles, emissionsPerFrame);
 		Mat flameFrame = addFlame(frame, trackingLocation, ParticleContainer, MaxParticles);
 		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;

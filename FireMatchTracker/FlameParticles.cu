@@ -4,9 +4,15 @@
 #include "Particle.h"
 
 __host__ __device__
-void Particle::setValues(glm::vec3 pos, glm::vec3 vel, unsigned char colour[4], float sizeI, float angleI, float weightI, float lifeI) {
-	position = pos;
-	velocity = vel;
+void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], float sizeI, float angleI, float weightI, float lifeI) {
+	//position = pos;
+	//velocity = vel;
+	position[0] = pos[0];
+	position[1] = pos[1];
+	position[2] = pos[2];
+	velocity[0] = vel[0];
+	velocity[1] = vel[1];
+	velocity[2] = vel[2];
 	//acceleration = acc;
 	r = colour[0];
 	g = colour[1];
@@ -72,6 +78,14 @@ Particle *updateParticles(float deltaT, Particle *container, int maxParticles, i
 	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
 	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
 	//easier
+
+	//for debug only
+	return container;
+}
+
+Particle *initialSetValues(Particle *container, int maxParticles, float pos[3], float vel[3], unsigned char colour[4], float size, float angle, float weight, float life) {
+	//pos, vel, colour, size, angle, weight, life
+	//call a cuda kernel and initialise each of the particles simultaneously
 
 	//for debug only
 	return container;
