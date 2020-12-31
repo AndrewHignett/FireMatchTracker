@@ -12,7 +12,7 @@ using namespace cv::cuda;
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
-const int MaxParticles = 10000;
+//const int MaxParticles = 10000;
 const float FrameTime = 0.033;
 const int emissionsPerFrame = 100;
 //should be variable based on distance
@@ -70,19 +70,22 @@ int main(int argc, char** argv) {
 
 	int bufferedFrameCount = 0;
 	Mat *frameBuffer = new Mat[3];
-	Particle ParticleContainer[MaxParticles];
+	//int *MaxParticles;
+	//MaxParticles = (int*)malloc(sizeof(int));
+	//*MaxParticles = 10000;
+	Particle *particleContainer = (Particle*)malloc(sizeof(Particle) * MaxParticles);
 	//access violation need to be malloced
 	//glm::vec3 pos = { 0.0f, 0.0f, 0.0f };
 	//glm::vec3 vel = { 0.0f, 0.0f, 0.0f };
-	float pos[3] = { 0.0, 0.0, 0.0 };
-	float vel[3] = { 0.0, 0.0, 0.0 };
-	unsigned char colour[4] = { 0, 0, 0, 0 };
-	float size = 1;
+	//float pos[3] = { 0.0, 0.0, 0.0 };
+	//float vel[3] = { 0.0, 0.0, 0.0 };
+	//unsigned char colour[4] = { 0, 0, 0, 0 };
+	//float size = 1;
 	//angle and weight may be unnessecary for this particle system
-	float angle = 0;
-	float weight = 1;
-	float life = 0;
-	*ParticleContainer = *initialSetValues(ParticleContainer, MaxParticles, pos, vel, colour, size, angle, weight, life);
+	//float angle = 0;
+	//float weight = 1;
+	//float life = 0;
+	*particleContainer = *initialSetValues(particleContainer);
 	namedWindow("frame", 1);
 	for (;;)
 	{
@@ -106,10 +109,10 @@ int main(int argc, char** argv) {
 		//averageFrame(frameBuffer).copyTo(outFrame);
 		//imshow("frame", outFrame);
 		//Sort the particle list
-		std::sort(ParticleContainer, ParticleContainer + MaxParticles);
+		//std::sort(particleContainer, particleContainer + *MaxParticles);
 		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
-		*ParticleContainer = *updateParticles(FrameTime, ParticleContainer, MaxParticles, emissionsPerFrame);
-		Mat flameFrame = addFlame(frame, trackingLocation, ParticleContainer, MaxParticles);
+		*particleContainer = *updateParticles(FrameTime, particleContainer, MaxParticles, emissionsPerFrame);
+		Mat flameFrame = addFlame(frame, trackingLocation, particleContainer, MaxParticles);
 		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);

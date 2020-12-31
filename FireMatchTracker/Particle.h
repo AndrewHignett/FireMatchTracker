@@ -34,5 +34,7 @@ class ParticleSystem {
 
 Particle *updateParticles(float deltaT, Particle *container, int maxParticles, int emissionsPerFrame);
 Mat addFlame(Mat frame, int matchTip[2], Particle *container, int maxParticles);
-Particle *initialSetValues(Particle *container, int maxParticles, float pos[3], float vel[3], unsigned char colour[4], float size, float angle, float weight, float life);
+Particle *initialSetValues(Particle *container);
+
+const int MaxParticles = 10000;
 #endif

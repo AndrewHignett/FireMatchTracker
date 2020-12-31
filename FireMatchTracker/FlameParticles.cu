@@ -65,7 +65,26 @@ __global__ void particleKernel(Particle *container, int maxParticles, int emissi
 	}
 }
 
+__global__ void initialParticleKernel(Particle *container) {
+	//printf("%d\n", MaxParticles);
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < MaxParticles)
+	{
+		float pos[3] = { 0.0, 0.0, 0.0 };
+		float vel[3] = { 0.0, 0.0, 0.0 };
+		unsigned char colour[4] = { 0, 0, 0, 0 };
+		float size = 1;
+		//angle and weight may be unnessecary for this particle system
+		float angle = 0;
+		float weight = 1;
+		float life = 0;
+		//printf("%f\n", life);
+		container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+	}
+}
+
 //update the particle postions and return the new positions, before adding the flame to the frame
+//the particles are already sorted by their life, low to high
 Particle *updateParticles(float deltaT, Particle *container, int maxParticles, int emissionsPerFrame) {
 	//add a new number of particles based on the emmissions per frame
 	//max out at maxParticles
@@ -78,15 +97,68 @@ Particle *updateParticles(float deltaT, Particle *container, int maxParticles, i
 	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
 	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
 	//easier
-
+	//printf("%f\n", container[100].getLife());
+	float pos[3] = { 0.0, 0.0, 0.0 };
+	float vel[3] = { 0.0, 0.0, 0.0 };
+	unsigned char colour[4] = { 0, 0, 0, 0 };
+	float size = 1;
+	//angle and weight may be unnessecary for this particle system
+	float angle = 0;
+	float weight = 1;
+	float life = container[100].getLife() + 1;
+	//printf("%f\n", life);
+	container[100].setValues(pos, vel, colour, size, angle, weight, life);
 	//for debug only
 	return container;
 }
 
-Particle *initialSetValues(Particle *container, int maxParticles, float pos[3], float vel[3], unsigned char colour[4], float size, float angle, float weight, float life) {
+Particle *initialSetValues(Particle *container) {
 	//pos, vel, colour, size, angle, weight, life
 	//call a cuda kernel and initialise each of the particles simultaneously
-
+	int threadCount = 1024;
+	int blocks = (MaxParticles - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = MaxParticles;
+	}
+	Particle *d_container;
+	//float *d_pos[3], *d_vel[3];
+	//unsigned char *d_colour[4];
+	//float *d_size, *d_angle, *d_weight, *d_life;
+	//Particle *containerCopy;
+	//int *maxParticlesCopy;
+	//float *posCopy[3], *velCopy[3];
+	//unsigned char *colourCopy[4];
+	//float *sizeCopy, *angleCopy, *weightCopy, *lifeCopy;
+	//allocate host memory for initialiser variables
+	//containerCopy = (Particle*)malloc(sizeof(Particle) * maxParticles);
+	//maxParticlesCopy = (int*)malloc(sizeof(int));
+	//*posCopy = (float*)malloc(sizeof(float) * 3);
+	//*velCopy = (float*)malloc(sizeof(float) * 3);
+	//*colourCopy = (unsigned char*)malloc(sizeof(unsigned char) * 4);
+	//sizeCopy = (float*)malloc(sizeof(float));
+	//angleCopy = (float*)malloc(sizeof(float));
+	//weightCopy = (float*)malloc(sizeof(float));
+	//lifeCopy = (float*)malloc(sizeof(float));
+	//allocate device memory for the particle container
+	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
+	//transfer from host to device memory
+	//cudaMemcpy(d_container, container, sizeof(Particle) * MaxParticles, cudaMemcpyHostToDevice);
+	//allocate device memory for the maxParticle count
+	//cudaMalloc((void**)&d_maxParticles, sizeof(int));
+	//transfer from host to device memory
+	//cudaMemcpy(d_maxParticles, maxParticles, sizeof(int), cudaMemcpyHostToDevice);
+	initialParticleKernel << <blocks, threadCount >> > (d_container);
+	//cudaError_t error = cudaGetLastError();
+	//if (error != cudaSuccess){
+	//	printf("%s\n", cudaGetErrorString(error));
+	//}
+	cudaDeviceSynchronize;
+	//copy device memory for the particle container back to host memory
+	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
+	//free(containerCopy);
+	//free(maxParticlesCopy);
+	cudaFree(d_container);
 	//for debug only
 	return container;
 }

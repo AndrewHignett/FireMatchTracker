@@ -7,7 +7,6 @@
 #include <set>
 using namespace cv::cuda;
 
-
 #define X 1280
 #define Y 720
 
@@ -274,7 +273,7 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 
 
 int* getMatchLocation(std::set<int> *trackingLocations){
-	int *matchTip = (int*)malloc(2 * sizeof(int));
+	int matchTip[2];// = (int*)malloc(2 * sizeof(int));
 	matchTip[0] =  -1;
 	matchTip[1] = -1;
 	int trackA[2];
@@ -403,10 +402,10 @@ int* track(Mat frame) {
 	//cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_erodedFrame, d_copyFrame);
-	cudaError_t error2 = cudaGetLastError();
+	/*cudaError_t error2 = cudaGetLastError();
 	if (error2 != cudaSuccess) {
 		printf("2. Error: %s\n", cudaGetErrorString(error2));
-	}
+	}*/
 	cudaDeviceSynchronize();
 
 	//Free erodedFrame pointer device memory
@@ -440,6 +439,7 @@ int* track(Mat frame) {
 	//Free the tracked frame from device memory
 	cudaFree(d_trackedFramePtr);
 	d_trackedFrame.release();
+	trackedFrame.release();
 
 	int *tip = getMatchLocation(trackingLocations);
 	if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
@@ -472,6 +472,7 @@ int* track(Mat frame) {
 		frame.data[(tip[1] - 1) * frame.step + (tip[0] - 1) * 3 + 2] = 0;
 	}
 
+	delete [] trackingLocations;
 	
 	return tip;
 	//return outFrame;
