@@ -43,24 +43,30 @@ void Particle::updateParticle(float deltaT) {
 	//if the life is above the particle lifespan, then remove particle by resetting start inital particle attributes
 }
 
-Mat addFlame(Mat frame, int matchTip[2], Particle *container, int maxParticles) {
+Mat addFlame(Mat frame, int matchTip[2], Particle *container) {
 	//for debug only
 	return frame;
 }
 
-__global__ void particleKernel(Particle *container, int maxParticles, int emissionsPerFrame){
+__global__ void particleKernel(Particle *container, int *matchTip){
 
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	if (threadId < maxParticles)
+	if (threadId < MaxParticles)
 	{
 		if (container[threadId].getLife() > 0) {
-			//update active particles
+			//update all active particles
 			//some may be reduced to a life below 0
+			float life = container[0].getLife() + EmissionsPerFrame;
+			//container[0].setValues(pos, vel, colour, size, angle, weight, life);
 		}
-		else if (threadId < emissionsPerFrame) {
+		else if (threadId < EmissionsPerFrame) {
+			//update EmissionsPerFrame particles that have a life <= 0
 			//inactive particles, all will have a life <= 0
 			//update these particles as new particles
 			//it's possible this may be less than the number of emmissions per frame and that there still may be remaining inactive particles
+			float life = container[0].getLife() + EmissionsPerFrame;
+
+			//container[0].setValues(pos, vel, colour, size, angle, weight, life);
 		}
 	}
 }
@@ -85,7 +91,7 @@ __global__ void initialParticleKernel(Particle *container) {
 
 //update the particle postions and return the new positions, before adding the flame to the frame
 //the particles are already sorted by their life, low to high
-Particle *updateParticles(float deltaT, Particle *container, int maxParticles, int emissionsPerFrame) {
+Particle *updateParticles(Particle *container, int matchTip[2]) {
 	//add a new number of particles based on the emmissions per frame
 	//max out at maxParticles
 	//it's possible for particles to be removed, as they time out
@@ -97,7 +103,6 @@ Particle *updateParticles(float deltaT, Particle *container, int maxParticles, i
 	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
 	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
 	//easier
-	//printf("%f\n", container[100].getLife());
 	float pos[3] = { 0.0, 0.0, 0.0 };
 	float vel[3] = { 0.0, 0.0, 0.0 };
 	unsigned char colour[4] = { 0, 0, 0, 0 };
@@ -105,9 +110,26 @@ Particle *updateParticles(float deltaT, Particle *container, int maxParticles, i
 	//angle and weight may be unnessecary for this particle system
 	float angle = 0;
 	float weight = 1;
-	float life = container[100].getLife() + 1;
-	//printf("%f\n", life);
-	container[100].setValues(pos, vel, colour, size, angle, weight, life);
+
+	int threadCount = 1024;
+	int blocks = (MaxParticles - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = MaxParticles;
+	}
+
+	Particle *d_container;
+	int *d_matchTip;
+	//allocate device memory for deltaT, the particle container and the emissions per frame
+	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
+	cudaMalloc((void**)&d_matchTip, sizeof(int) * 2);
+	//transfer from host to device memory	
+	cudaMemcpy(d_container, container, sizeof(Particle) * MaxParticles, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_matchTip, matchTip, sizeof(int) * 2, cudaMemcpyHostToDevice);
+	particleKernel<<<blocks, threadCount>>>(d_container, d_matchTip);
+	
+	cudaFree(d_container);
+	cudaFree(d_matchTip);
 	//for debug only
 	return container;
 }
@@ -122,24 +144,6 @@ Particle *initialSetValues(Particle *container) {
 		threadCount = MaxParticles;
 	}
 	Particle *d_container;
-	//float *d_pos[3], *d_vel[3];
-	//unsigned char *d_colour[4];
-	//float *d_size, *d_angle, *d_weight, *d_life;
-	//Particle *containerCopy;
-	//int *maxParticlesCopy;
-	//float *posCopy[3], *velCopy[3];
-	//unsigned char *colourCopy[4];
-	//float *sizeCopy, *angleCopy, *weightCopy, *lifeCopy;
-	//allocate host memory for initialiser variables
-	//containerCopy = (Particle*)malloc(sizeof(Particle) * maxParticles);
-	//maxParticlesCopy = (int*)malloc(sizeof(int));
-	//*posCopy = (float*)malloc(sizeof(float) * 3);
-	//*velCopy = (float*)malloc(sizeof(float) * 3);
-	//*colourCopy = (unsigned char*)malloc(sizeof(unsigned char) * 4);
-	//sizeCopy = (float*)malloc(sizeof(float));
-	//angleCopy = (float*)malloc(sizeof(float));
-	//weightCopy = (float*)malloc(sizeof(float));
-	//lifeCopy = (float*)malloc(sizeof(float));
 	//allocate device memory for the particle container
 	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
 	//transfer from host to device memory

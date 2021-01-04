@@ -13,8 +13,7 @@ using namespace cv::cuda;
 #define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 //const int MaxParticles = 10000;
-const float FrameTime = 0.033;
-const int emissionsPerFrame = 100;
+//const int emissionsPerFrame = 100;
 //should be variable based on distance
 int matchWidth = 20;
 
@@ -74,6 +73,7 @@ int main(int argc, char** argv) {
 	//MaxParticles = (int*)malloc(sizeof(int));
 	//*MaxParticles = 10000;
 	Particle *particleContainer = (Particle*)malloc(sizeof(Particle) * MaxParticles);
+	int *trackingLocation = (int*)malloc(sizeof(int) * 2);
 	//access violation need to be malloced
 	//glm::vec3 pos = { 0.0f, 0.0f, 0.0f };
 	//glm::vec3 vel = { 0.0f, 0.0f, 0.0f };
@@ -102,17 +102,17 @@ int main(int argc, char** argv) {
 
 		//keep initial frame image as well as tracking overlay
 		//Mat outFrame = track(frame);
-		int* trackingLocation = track(frame);
+		track(frame, trackingLocation);
 		//updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
 		//bufferedFrameCount++;
 		//if (bufferedFrameCount > 2){
 		//averageFrame(frameBuffer).copyTo(outFrame);
 		//imshow("frame", outFrame);
 		//Sort the particle list
-		//std::sort(particleContainer, particleContainer + *MaxParticles);
+		std::sort(particleContainer, particleContainer + MaxParticles);
 		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
-		*particleContainer = *updateParticles(FrameTime, particleContainer, MaxParticles, emissionsPerFrame);
-		Mat flameFrame = addFlame(frame, trackingLocation, particleContainer, MaxParticles);
+		*particleContainer = *updateParticles(particleContainer, trackingLocation);
+		Mat flameFrame = addFlame(frame, trackingLocation, particleContainer);
 		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);

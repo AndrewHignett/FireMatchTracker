@@ -324,7 +324,7 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 
 //any reference to editing the final frame can be removed
 //Mat track(Mat frame) {
-int* track(Mat frame) {
+void track(Mat frame, int *tip) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
 	if (blocks == 1)
@@ -441,7 +441,8 @@ int* track(Mat frame) {
 	d_trackedFrame.release();
 	trackedFrame.release();
 
-	int *tip = getMatchLocation(trackingLocations);
+	//tip = getMatchLocation(trackingLocations);
+	memcpy(tip, getMatchLocation(trackingLocations), sizeof(int) * 2);
 	if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
 		frame.data[tip[1] * frame.step + tip[0] * 3] = 0;
 		frame.data[tip[1] * frame.step + tip[0] * 3 + 1] = 255;
@@ -474,7 +475,7 @@ int* track(Mat frame) {
 
 	delete [] trackingLocations;
 	
-	return tip;
+	//return tip;
 	//return outFrame;
 	//return *outFrame;
 	//For the sake of debugging 

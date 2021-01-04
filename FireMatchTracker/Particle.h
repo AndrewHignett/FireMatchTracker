@@ -32,9 +32,12 @@ class ParticleSystem {
 	int emmissionsPerFrame;
 };
 
-Particle *updateParticles(float deltaT, Particle *container, int maxParticles, int emissionsPerFrame);
-Mat addFlame(Mat frame, int matchTip[2], Particle *container, int maxParticles);
+Particle *updateParticles(Particle *container, int matchTip[2]);
+Mat addFlame(Mat frame, int matchTip[2], Particle *container);
 Particle *initialSetValues(Particle *container);
 
 const int MaxParticles = 10000;
+__device__
+const float FrameTime = 0.033;
+const int EmissionsPerFrame = 100;
 #endif

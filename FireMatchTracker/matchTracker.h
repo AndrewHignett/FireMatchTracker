@@ -14,6 +14,6 @@ using namespace cv;
 
 #ifndef _matchTracker_
 #define _matchTracker_
-int* track(Mat frame);
+void track(Mat frame, int *tip);
 Mat averageFrame(Mat buffer[3]);
 #endif
