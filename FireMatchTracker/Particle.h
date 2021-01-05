@@ -22,6 +22,8 @@ public:
 	void updateParticle(float);
 	__host__ __device__
 	float getLife() { return life; };
+	__host__ __device__
+	float *getPosition() { return position; };
 };
 
 //class container for the particle system, may be unnecessary
@@ -33,7 +35,7 @@ class ParticleSystem {
 };
 
 Particle *updateParticles(Particle *container, int matchTip[2]);
-Mat addFlame(Mat frame, int matchTip[2], Particle *container);
+Mat addFlame(Mat frame, Particle *container);
 Particle *initialSetValues(Particle *container);
 
 const int MaxParticles = 10000;

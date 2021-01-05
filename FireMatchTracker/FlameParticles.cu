@@ -1,5 +1,8 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include <opencv2/cudaarithm.hpp>
+#include <opencv2/cudafilters.hpp>
+#include "opencv2/cudaimgproc.hpp"
 #include "matchTracker.h"
 #include "Particle.h"
 
@@ -43,7 +46,55 @@ void Particle::updateParticle(float deltaT) {
 	//if the life is above the particle lifespan, then remove particle by resetting start inital particle attributes
 }
 
-Mat addFlame(Mat frame, int matchTip[2], Particle *container) {
+__global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container) {
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < MaxParticles)
+	{
+		//printf("%d %d %f\n", MaxParticles, threadId, container[threadId].getLife());
+		if ((threadId < MaxParticles) && (container[threadId].getLife() > 0)) {
+			//int row = threadId / X;
+			//int column = threadId % X;
+			float *xyz = container[threadId].getPosition();
+			int row = xyz[1];
+			int column = xyz[0];
+			//BGR pixel values
+			frame.data[(row*frame.step) + column * 3] = 0;
+			frame.data[(row*frame.step) + column * 3 + 1] = 255;
+			frame.data[(row*frame.step) + column * 3 + 2] = 255;
+		}
+		
+	}
+}
+
+Mat addFlame(Mat frame, Particle *container) {
+	int threadCount = 1024;
+	int blocks = (MaxParticles - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = MaxParticles;
+	}
+	Particle *d_container;
+	//allocate device memory for the particle containe
+	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
+	//transfer from host to device memory	
+	cudaMemcpy(d_container, container, sizeof(Particle) * MaxParticles, cudaMemcpyHostToDevice);
+
+	uint8_t *d_imgPtr;
+	cv::cuda::GpuMat d_newFrame;
+	d_newFrame.upload(frame);
+
+	//Allocate device memory
+	cudaMalloc((void **)&d_imgPtr, d_newFrame.rows*d_newFrame.step);
+	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
+	flameKernel << <blocks, threadCount >> > (d_newFrame, d_container);
+	cudaDeviceSynchronize();
+	d_newFrame.download(frame);
+	//Free original frame pointer device memory
+	cudaFree(d_imgPtr);
+	d_newFrame.release();
+	//free the device memory for the particle container
+	cudaFree(d_container);
+
 	//for debug only
 	return frame;
 }
@@ -56,17 +107,36 @@ __global__ void particleKernel(Particle *container, int *matchTip){
 		if (container[threadId].getLife() > 0) {
 			//update all active particles
 			//some may be reduced to a life below 0
-			float life = container[0].getLife() + EmissionsPerFrame;
-			//container[0].setValues(pos, vel, colour, size, angle, weight, life);
+			float *pos = container[threadId].getPosition();
+			float vel[3] = { 0.0, 0.0, 0.0 };
+			unsigned char colour[4] = { 0, 0, 0, 0 };
+			float size = 1;
+			//angle and weight may be unnessecary for this particle system
+			float angle = 0;
+			float weight = 1;
+			float life = container[threadId].getLife() + FrameTime;
+			//give the particles a max life time
+			if (life < 0.5){
+				container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+			}
+			else {
+				container[threadId].setValues(pos, vel, colour, size, angle, weight, 0);
+			}
 		}
 		else if (threadId < EmissionsPerFrame) {
 			//update EmissionsPerFrame particles that have a life <= 0
 			//inactive particles, all will have a life <= 0
 			//update these particles as new particles
 			//it's possible this may be less than the number of emmissions per frame and that there still may be remaining inactive particles
-			float life = container[0].getLife() + EmissionsPerFrame;
-
-			//container[0].setValues(pos, vel, colour, size, angle, weight, life);
+			float pos[3] = { float(matchTip[0]), float(matchTip[1]), 0.0 };
+			float vel[3] = { 0.0, 0.0, 0.0 };
+			unsigned char colour[4] = { 0, 0, 0, 0 };
+			float size = 1;
+			//angle and weight may be unnessecary for this particle system
+			float angle = 0;
+			float weight = 1;
+			float life = FrameTime;
+			container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
 		}
 	}
 }
@@ -120,14 +190,15 @@ Particle *updateParticles(Particle *container, int matchTip[2]) {
 
 	Particle *d_container;
 	int *d_matchTip;
-	//allocate device memory for deltaT, the particle container and the emissions per frame
+	//allocate device memory for the particle container aand match tip
 	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
 	cudaMalloc((void**)&d_matchTip, sizeof(int) * 2);
 	//transfer from host to device memory	
 	cudaMemcpy(d_container, container, sizeof(Particle) * MaxParticles, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_matchTip, matchTip, sizeof(int) * 2, cudaMemcpyHostToDevice);
 	particleKernel<<<blocks, threadCount>>>(d_container, d_matchTip);
-	
+	cudaDeviceSynchronize;
+	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
 	cudaFree(d_container);
 	cudaFree(d_matchTip);
 	//for debug only
