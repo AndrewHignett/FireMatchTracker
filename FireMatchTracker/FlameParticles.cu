@@ -1,7 +1,11 @@
+#include <time.h>
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
 #include <opencv2/cudaarithm.hpp>
 #include <opencv2/cudafilters.hpp>
+#include <curand.h>
+#include <curand_kernel.h>
+#include <math.h>
 #include "opencv2/cudaimgproc.hpp"
 #include "matchTracker.h"
 #include "Particle.h"
@@ -88,6 +92,7 @@ Mat addFlame(Mat frame, Particle *container) {
 	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
 	flameKernel << <blocks, threadCount >> > (d_newFrame, d_container);
 	cudaDeviceSynchronize();
+	//Downloading frame can crash
 	d_newFrame.download(frame);
 	//Free original frame pointer device memory
 	cudaFree(d_imgPtr);
@@ -99,7 +104,7 @@ Mat addFlame(Mat frame, Particle *container) {
 	return frame;
 }
 
-__global__ void particleKernel(Particle *container, int *matchTip){
+__global__ void particleKernel(Particle *container, int *matchTip, curandState_t *states){
 
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < MaxParticles)
@@ -108,7 +113,9 @@ __global__ void particleKernel(Particle *container, int *matchTip){
 			//update all active particles
 			//some may be reduced to a life below 0
 			float *pos = container[threadId].getPosition();
-			float vel[3] = { 0.0, 0.0, 0.0 };
+			//float vel[3] = { 0.0, -200.0, 0.0 };
+			float *vel = container[threadId].getVelocity();
+			pos[1] += vel[1]*FrameTime;
 			unsigned char colour[4] = { 0, 0, 0, 0 };
 			float size = 1;
 			//angle and weight may be unnessecary for this particle system
@@ -128,8 +135,15 @@ __global__ void particleKernel(Particle *container, int *matchTip){
 			//inactive particles, all will have a life <= 0
 			//update these particles as new particles
 			//it's possible this may be less than the number of emmissions per frame and that there still may be remaining inactive particles
-			float pos[3] = { float(matchTip[0]), float(matchTip[1]), 0.0 };
-			float vel[3] = { 0.0, 0.0, 0.0 };
+			float width = 20;
+			float baseVelocity = -200;
+			curand_init(0, threadId, 0, &states[threadId]);
+			float randomStartPosX = curand_uniform(&states[threadId])*width - (width/2) + float(matchTip[0]);
+			float randomStartPosY = curand_uniform(&states[threadId])*(width/2) - (width / 4) + float(matchTip[1]);
+			float velY = curand_uniform(&states[threadId])*50 + baseVelocity;
+			float pos[3] = { randomStartPosX, randomStartPosY, 0.0 };
+			//float vel[3] = { 0.0, -200.0, 0.0 };
+			float vel[3] = { 0.0, velY, 0.0 };
 			unsigned char colour[4] = { 0, 0, 0, 0 };
 			float size = 1;
 			//angle and weight may be unnessecary for this particle system
@@ -147,7 +161,7 @@ __global__ void initialParticleKernel(Particle *container) {
 	if (threadId < MaxParticles)
 	{
 		float pos[3] = { 0.0, 0.0, 0.0 };
-		float vel[3] = { 0.0, 0.0, 0.0 };
+		float vel[3] = { 0.0, -200.0, 0.0 };
 		unsigned char colour[4] = { 0, 0, 0, 0 };
 		float size = 1;
 		//angle and weight may be unnessecary for this particle system
@@ -173,15 +187,9 @@ Particle *updateParticles(Particle *container, int matchTip[2]) {
 	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
 	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
 	//easier
-	float pos[3] = { 0.0, 0.0, 0.0 };
-	float vel[3] = { 0.0, 0.0, 0.0 };
-	unsigned char colour[4] = { 0, 0, 0, 0 };
-	float size = 1;
-	//angle and weight may be unnessecary for this particle system
-	float angle = 0;
-	float weight = 1;
 
-	int threadCount = 1024;
+	//reduced threadCount to fix the "Too many resources requested for launch" error
+	int threadCount = 256;
 	int blocks = (MaxParticles - 1) / threadCount + 1;
 	if (blocks == 1)
 	{
@@ -190,17 +198,27 @@ Particle *updateParticles(Particle *container, int matchTip[2]) {
 
 	Particle *d_container;
 	int *d_matchTip;
+	curandState_t *d_randStates;
 	//allocate device memory for the particle container aand match tip
 	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
 	cudaMalloc((void**)&d_matchTip, sizeof(int) * 2);
+	cudaMalloc((void**)&d_randStates, sizeof(curandState_t) * MaxParticles);
 	//transfer from host to device memory	
 	cudaMemcpy(d_container, container, sizeof(Particle) * MaxParticles, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_matchTip, matchTip, sizeof(int) * 2, cudaMemcpyHostToDevice);
-	particleKernel<<<blocks, threadCount>>>(d_container, d_matchTip);
+	particleKernel<<<blocks, threadCount>>>(d_container, d_matchTip, d_randStates);
+	//for testing the kernel for errors
+	cudaError_t err = cudaGetLastError();
+	if (err != cudaSuccess)
+	{
+		printf("CUDA Error: %s\n", cudaGetErrorString(err));
+	}
+
 	cudaDeviceSynchronize;
 	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
 	cudaFree(d_container);
 	cudaFree(d_matchTip);
+	cudaFree(d_randStates);
 	//for debug only
 	return container;
 }

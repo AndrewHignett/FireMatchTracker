@@ -15,6 +15,7 @@ class Particle {
 	unsigned char r, g, b, a; //colour and alpha
 	float size, angle, weight;
 	float life; //remaining life of the particle. Dead and unused if < 0
+	//include an original matchip X for easch particle, in order to taper towards the end of the flame
 public:
 	__host__ __device__
 	void setValues(float[3], float[3], unsigned char[4], float, float, float, float);
@@ -24,6 +25,8 @@ public:
 	float getLife() { return life; };
 	__host__ __device__
 	float *getPosition() { return position; };
+	__host__ __device__
+	float *getVelocity() { return velocity; };
 };
 
 //class container for the particle system, may be unnecessary

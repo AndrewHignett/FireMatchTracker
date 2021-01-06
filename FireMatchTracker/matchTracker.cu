@@ -443,7 +443,8 @@ void track(Mat frame, int *tip) {
 
 	//tip = getMatchLocation(trackingLocations);
 	memcpy(tip, getMatchLocation(trackingLocations), sizeof(int) * 2);
-	if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
+	//if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
+	if ((tip[0] > 0) && (tip[0] < X - 1) && (tip[0] > 0) && (tip[1] < Y - 1) && (tip[1] > 0)) {
 		frame.data[tip[1] * frame.step + tip[0] * 3] = 0;
 		frame.data[tip[1] * frame.step + tip[0] * 3 + 1] = 255;
 		frame.data[tip[1] * frame.step + tip[0] * 3 + 2] = 0;
@@ -474,12 +475,6 @@ void track(Mat frame, int *tip) {
 	}
 
 	delete [] trackingLocations;
-	
-	//return tip;
-	//return outFrame;
-	//return *outFrame;
-	//For the sake of debugging 
-	//return frame;
 }
 
 Mat averageFrame(Mat buffer[3]) {
