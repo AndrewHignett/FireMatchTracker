@@ -10,6 +10,85 @@
 #include "matchTracker.h"
 #include "Particle.h"
 
+__global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame, int x, int y)
+{
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	if (threadId < x * y)
+	{
+		int row = threadId / x;
+		int column = threadId % x;
+		uint8_t pixelR = dilatedFrame.data[(row*dilatedFrame.step) + column * 3 + 2];
+
+		if (pixelR == 255)
+		{
+			bool allPixelsRed = true;
+			for (int i = -2; i < 3; i++)
+			{
+				for (int j = -2; j < 3; j++)
+				{
+					if ((row + i > -1) && (row + i < y) && (column + j > -1) && (column + j < x))
+					{
+						if (dilatedFrame.data[((row + i)*dilatedFrame.step) + (column + j) * 3 + 2] == 0)
+						{
+							allPixelsRed = false;
+						}
+					}
+				}
+			}
+			if (allPixelsRed)
+			{
+				out.data[(row*out.step) + column * 3] = 0;
+				out.data[(row*out.step) + column * 3 + 1] = 255;
+				out.data[(row*out.step) + column * 3 + 2] = 0;
+			}
+		}
+	}
+}
+
+//out must be a black frame
+__global__ void genericDilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameFrame, int *particleCount)
+{
+	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	int x = WINDOW_WIDTH;
+	int y = WINDOW_HEIGHT;
+	if (threadId < x * y)
+	{
+		int row = threadId / x;
+		int column = threadId % x;
+		uint8_t pixelR = flameFrame.data[(row*flameFrame.step) + column * 3 + 2];
+		uint8_t pixelG = flameFrame.data[(row*flameFrame.step) + column * 3 + 1];
+		uint8_t pixelB = flameFrame.data[(row*flameFrame.step) + column * 3];
+		
+		//printf("%d %d %d\n", threadId, x, y);
+		if ((pixelR + pixelG + pixelB) > 0)
+		{
+			printf("%d %u %u %u\n", threadId, pixelR, pixelG, pixelB);
+			for (int i = -6; i < 7; i++)
+			{
+				for (int j = -6; j < 7; j++)
+				{
+					if (!(i == 0 && j == 0))
+					{
+						if ((row + i > -1) && (row + i < y) && (column + j > -1) && (column + j < x))
+						{
+							//out.data[((row + i)*out.step) + (column + j) * 3 + 2] = 255;
+							out.data[((row + i)*out.step) + (column + j) * 3 + 2] = (out.data[((row + i)*out.step) + (column + j) * 3 + 2] * particleCount[(row + i)*out.step + (column + j)] + flameFrame.data[row*flameFrame.step + column * 3 + 2]) / (particleCount[(row + i)*out.step + (column + j)] + 1);
+							out.data[((row + i)*out.step) + (column + j) * 3 + 1] = (out.data[((row + i)*out.step) + (column + j) * 3 + 1] * particleCount[(row + i)*out.step + (column + j)] + flameFrame.data[row*flameFrame.step + column * 3 + 1]) / (particleCount[(row + i)*out.step + (column + j)] + 1);
+							out.data[((row + i)*out.step) + (column + j) * 3] = (out.data[((row + i)*out.step) + (column + j) * 3] * particleCount[(row + i)*out.step + (column + j)] + flameFrame.data[row*flameFrame.step + column * 3]) / (particleCount[(row + i)*out.step + (column + j)] + 1);
+							particleCount[(row + i)*out.step + (column + j) * 3 + 2] += 1;
+							particleCount[(row + i)*out.step + (column + j) * 3 + 1] += 1;
+							particleCount[(row + i)*out.step + (column + j) * 3] += 1;
+							//printf("%d\n", out.data[((row + i)*out.step) + (column + j) * 3 + 2]);
+							//printf("%d %d %d %d\n", threadId, row, column, flameFrame.data[row*flameFrame.step + column * 3 + 2]);
+						}
+					}
+				}
+			}
+		}
+
+	}
+}
+
 __host__ __device__
 void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], float sizeI, float angleI, float weightI, float lifeI) {
 	//position = pos;
@@ -92,13 +171,53 @@ Mat addFlame(Mat frame, Particle *container) {
 	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
 	flameKernel << <blocks, threadCount >> > (d_newFrame, d_container);
 	cudaDeviceSynchronize();
+
+	//int xCopy = (int)malloc(sizeof(int));
+	//int yCopy = (int)malloc(sizeof(int));
+	//xCopy = x;
+	//yCopy = y;
+	int x = WINDOW_WIDTH;
+	int y = WINDOW_HEIGHT;
+	int *particleCount;
+	particleCount = (int*)malloc(sizeof(int)*x*y*3);
+	memset(particleCount, 0, sizeof(int)*x*y*3);
+	Mat out(y, x, CV_8UC3, cv::Scalar(0, 0, 0));
+	uint8_t *d_outPtr;
+	cv::cuda::GpuMat d_out;
+	d_out.upload(out);
+	//int *d_x, *d_y, *d_particleCount;
+	int *d_particleCount;
+	//cudaMalloc((void**)&d_x, sizeof(int));
+	//cudaMalloc((void**)&d_y, sizeof(int));
+	cudaMalloc((void**)&d_particleCount, sizeof(int)*x*y*3);
+	cudaMalloc((void**)&d_outPtr, d_out.rows*d_out.step);
+	//cudaMemcpy(d_x, &x, sizeof(int), cudaMemcpyHostToDevice);
+	//cudaMemcpy(d_y, &y, sizeof(int), cudaMemcpyHostToDevice);
+	cudaMemcpy(d_particleCount, particleCount, sizeof(int)*x*y, cudaMemcpyHostToDevice);
+	cudaMemcpyAsync(d_outPtr, d_out.ptr<uint8_t>(), d_out.rows*d_out.step, cudaMemcpyDeviceToDevice);
+
+	threadCount = 1024;
+	blocks = (x * y - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = x* y;
+	}
+
+	genericDilateKernel << <blocks, threadCount >> > (d_out, d_newFrame, d_particleCount);
 	//Downloading frame can crash
-	d_newFrame.download(frame);
+	//d_newFrame.download(frame);
+	d_out.download(frame);
 	//Free original frame pointer device memory
 	cudaFree(d_imgPtr);
 	d_newFrame.release();
+	cudaFree(d_outPtr);
+	d_out.release();
+	cudaFree(d_particleCount);
 	//free the device memory for the particle container
 	cudaFree(d_container);
+
+	//free host memory
+	free(particleCount);
 
 	//for debug only
 	return frame;

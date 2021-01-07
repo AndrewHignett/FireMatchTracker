@@ -16,4 +16,7 @@ using namespace cv;
 #define _matchTracker_
 void track(Mat frame, int *tip);
 Mat averageFrame(Mat buffer[3]);
+
+#define WINDOW_WIDTH 1280
+#define WINDOW_HEIGHT 720
 #endif

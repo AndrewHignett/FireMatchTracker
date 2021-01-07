@@ -535,3 +535,27 @@ Mat averageFrame(Mat buffer[3]) {
 	//for the sake of debugging
 	return buffer[0];
 }
+
+/*
+Mat blackFrame(Mat frame) {
+	int threadCount = 1024;
+	int blocks = (X * Y - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = X * Y;
+	}
+	//Set up device variables
+	uint8_t *d_imgPtr;
+	cv::cuda::GpuMat d_newFrame;
+	d_newFrame.upload(frame);
+
+	//Allocate device memory
+	cudaMalloc((void **)&d_imgPtr, d_newFrame.rows*d_newFrame.step);
+	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
+	getRedKernel << <blocks, threadCount >> > (d_outFrame);
+	cudaDeviceSynchronize();
+	d_newFrame.download(frame);
+	//Free original frame pointer device memory
+	cudaFree(d_imgPtr);
+	d_newFrame.release();
+}*/

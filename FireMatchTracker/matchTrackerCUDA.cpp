@@ -9,8 +9,6 @@ using namespace cv::cuda;
 #include "matchTracker.h"
 #include "Particle.h"
 
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 //const int MaxParticles = 10000;
 //const int emissionsPerFrame = 100;
@@ -112,9 +110,11 @@ int main(int argc, char** argv) {
 		std::sort(particleContainer, particleContainer + MaxParticles);
 		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
 		*particleContainer = *updateParticles(particleContainer, trackingLocation);
+		Mat frameCopy(WINDOW_HEIGHT, WINDOW_WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 		//no need to sort before adding the flame as each particle can be tested in parrallel
-		Mat flameFrame = addFlame(frame, particleContainer);
-		imshow("frame", flameFrame);
+		Mat flameFrame = addFlame(frameCopy, particleContainer);
+		//imshow("frame", flameFrame);
+		imshow("frame", frameCopy);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 		//}
