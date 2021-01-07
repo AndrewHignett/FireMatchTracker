@@ -27,6 +27,14 @@ public:
 	float *getPosition() { return position; };
 	__host__ __device__
 	float *getVelocity() { return velocity; };
+	__host__ __device__
+	unsigned char getRed() { return r; };
+	__host__ __device__
+	unsigned char getGreen() { return g; };
+	__host__ __device__
+	unsigned char getBlue() { return b; };
+	__host__ __device__
+	unsigned char getAlpha() { return a; };
 };
 
 //class container for the particle system, may be unnecessary
@@ -41,8 +49,8 @@ Particle *updateParticles(Particle *container, int matchTip[2]);
 Mat addFlame(Mat frame, Particle *container);
 Particle *initialSetValues(Particle *container);
 
-const int MaxParticles = 10000;
+const int MaxParticles = 1000;
 __device__
 const float FrameTime = 0.033;
-const int EmissionsPerFrame = 100;
+const int EmissionsPerFrame = 25;
 #endif

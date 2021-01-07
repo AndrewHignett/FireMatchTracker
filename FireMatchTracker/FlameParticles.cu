@@ -62,9 +62,9 @@ __global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container) {
 			int row = xyz[1];
 			int column = xyz[0];
 			//BGR pixel values
-			frame.data[(row*frame.step) + column * 3] = 0;
-			frame.data[(row*frame.step) + column * 3 + 1] = 255;
-			frame.data[(row*frame.step) + column * 3 + 2] = 255;
+			frame.data[(row*frame.step) + column * 3] = container[threadId].getBlue();
+			frame.data[(row*frame.step) + column * 3 + 1] = container[threadId].getGreen();
+			frame.data[(row*frame.step) + column * 3 + 2] = container[threadId].getRed();
 		}
 		
 	}
@@ -113,20 +113,28 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 			//update all active particles
 			//some may be reduced to a life below 0
 			float *pos = container[threadId].getPosition();
-			//float vel[3] = { 0.0, -200.0, 0.0 };
+			//float vel[3] = { 0.0, -300.0, 0.0 };
 			float *vel = container[threadId].getVelocity();
 			pos[1] += vel[1]*FrameTime;
-			unsigned char colour[4] = { 0, 0, 0, 0 };
 			float size = 1;
 			//angle and weight may be unnessecary for this particle system
 			float angle = 0;
 			float weight = 1;
 			float life = container[threadId].getLife() + FrameTime;
+			//unsigned char colour[4] = { container[threadId].getRed(), 85*log10f(32/life), life * 2 * 255, container[threadId].getAlpha() };
+			unsigned char colour[4] = { container[threadId].getRed(), 85 * log10f(32 / life), container[threadId].getBlue(), container[threadId].getAlpha() };
 			//give the particles a max life time
 			if (life < 0.5){
+				
+				container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+			}
+			else if (life < 0.6) {
+				unsigned char colour[4] = { 144, 144, 144, container[threadId].getAlpha() };
 				container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
 			}
 			else {
+				//unsigned char colour[4] = { container[threadId].getRed(), 85 * log10f(32 / life), container[threadId].getBlue(), container[threadId].getAlpha() };
+				unsigned char colour[4] = { 255, 255, 0, container[threadId].getAlpha() };
 				container[threadId].setValues(pos, vel, colour, size, angle, weight, 0);
 			}
 		}
@@ -140,11 +148,14 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 			curand_init(0, threadId, 0, &states[threadId]);
 			float randomStartPosX = curand_uniform(&states[threadId])*width - (width/2) + float(matchTip[0]);
 			float randomStartPosY = curand_uniform(&states[threadId])*(width/2) - (width / 4) + float(matchTip[1]);
-			float velY = curand_uniform(&states[threadId])*50 + baseVelocity;
+			float velY = curand_uniform(&states[threadId])*200 + baseVelocity;
+			if (velY > -50) {
+				velY = -100;
+			}
 			float pos[3] = { randomStartPosX, randomStartPosY, 0.0 };
-			//float vel[3] = { 0.0, -200.0, 0.0 };
+			//float vel[3] = { 0.0, -300.0, 0.0 };
 			float vel[3] = { 0.0, velY, 0.0 };
-			unsigned char colour[4] = { 0, 0, 0, 0 };
+			unsigned char colour[4] = { container[threadId].getRed(), container[threadId].getGreen(), container[threadId].getBlue(), container[threadId].getAlpha() };
 			float size = 1;
 			//angle and weight may be unnessecary for this particle system
 			float angle = 0;
@@ -161,8 +172,8 @@ __global__ void initialParticleKernel(Particle *container) {
 	if (threadId < MaxParticles)
 	{
 		float pos[3] = { 0.0, 0.0, 0.0 };
-		float vel[3] = { 0.0, -200.0, 0.0 };
-		unsigned char colour[4] = { 0, 0, 0, 0 };
+		float vel[3] = { 0.0, -300.0, 0.0 };
+		unsigned char colour[4] = { 255, 255, 0, 0 };
 		float size = 1;
 		//angle and weight may be unnessecary for this particle system
 		float angle = 0;
