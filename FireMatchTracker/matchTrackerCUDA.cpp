@@ -7,17 +7,15 @@ using namespace std;
 #include <opencv2/cudaarithm.hpp>
 using namespace cv::cuda;
 #include "matchTracker.h"
+#include "Particle.h"
 
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 720
 #define WINDOW_TITLE "Window"
 
-//For the flame setup
-struct Particle {
-	glm::vec4 Position;
-	glm::vec4 velocity;
-	glm::vec4 Color;
-};
+//Untseted approach to a quicksort
+bool operator<(Particle& x, Particle& y)
+{
+	return x.getLife() < y.getLife();
+}
 
 void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 	if (currentSize >= 3) {
@@ -37,18 +35,17 @@ void updateBuffer(Mat buffer[3], Mat newFrame, int currentSize) {
 
 int main(int argc, char** argv) {
 	//test window setup
-	glfwInit();
-	GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
-	glfwMakeContextCurrent(window);
-	glewExperimental = GL_TRUE;
+	//glfwInit();
+	//GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE, NULL, NULL);
+	//glfwMakeContextCurrent(window);
+	//glewExperimental = GL_TRUE;
 
-	if (glewInit() != GLEW_OK) {
+	//if (glewInit() != GLEW_OK) {
 		//error with initialisation
-		glfwTerminate();
-	}
+		//glfwTerminate();
+	//}
 
 	//try to have a particle effect on a transparent background and then apply to each frame
-
 
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());
@@ -66,6 +63,9 @@ int main(int argc, char** argv) {
 
 	int bufferedFrameCount = 0;
 	Mat *frameBuffer = new Mat[3];
+	Particle *particleContainer = (Particle*)malloc(sizeof(Particle) * MaxParticles);
+	int *trackingLocation = (int*)malloc(sizeof(int) * 2);
+	*particleContainer = *initialSetValues(particleContainer);
 	namedWindow("frame", 1);
 	for (;;)
 	{
@@ -81,12 +81,21 @@ int main(int argc, char** argv) {
 		//Type is CV_U8 = unsigned char
 
 		//keep initial frame image as well as tracking overlay
-		Mat outFrame = track(frame);
+		//Mat outFrame = track(frame);
+		track(frame, trackingLocation);
 		//updateBuffer(frameBuffer, outFrame, bufferedFrameCount);
 		//bufferedFrameCount++;
 		//if (bufferedFrameCount > 2){
 		//averageFrame(frameBuffer).copyTo(outFrame);
-		imshow("frame", outFrame);
+		//imshow("frame", outFrame);
+		//Sort the particle list
+		std::sort(particleContainer, particleContainer + MaxParticles);
+		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
+		Mat flameFrame(WINDOW_HEIGHT, WINDOW_WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+		*particleContainer = *updateParticles(particleContainer, trackingLocation);
+		//no need to sort before adding the flame as each particle can be tested in parrallel
+		addFlame(flameFrame, frame, particleContainer);
+		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 		//}

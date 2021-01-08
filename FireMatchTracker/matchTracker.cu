@@ -7,7 +7,6 @@
 #include <set>
 using namespace cv::cuda;
 
-
 #define X 1280
 #define Y 720
 
@@ -274,7 +273,7 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 
 
 int* getMatchLocation(std::set<int> *trackingLocations){
-	int *matchTip = (int*)malloc(2 * sizeof(int));
+	int matchTip[2];// = (int*)malloc(2 * sizeof(int));
 	matchTip[0] =  -1;
 	matchTip[1] = -1;
 	int trackA[2];
@@ -322,7 +321,10 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 	return matchTip;
 }
 
-Mat track(Mat frame) {
+
+//any reference to editing the final frame can be removed
+//Mat track(Mat frame) {
+void track(Mat frame, int *tip) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
 	if (blocks == 1)
@@ -400,10 +402,10 @@ Mat track(Mat frame) {
 	//cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_erodedFrame, d_copyFrame);
-	cudaError_t error2 = cudaGetLastError();
+	/*cudaError_t error2 = cudaGetLastError();
 	if (error2 != cudaSuccess) {
 		printf("2. Error: %s\n", cudaGetErrorString(error2));
-	}
+	}*/
 	cudaDeviceSynchronize();
 
 	//Free erodedFrame pointer device memory
@@ -437,9 +439,12 @@ Mat track(Mat frame) {
 	//Free the tracked frame from device memory
 	cudaFree(d_trackedFramePtr);
 	d_trackedFrame.release();
+	trackedFrame.release();
 
-	int *tip = getMatchLocation(trackingLocations);
-	if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
+	//tip = getMatchLocation(trackingLocations);
+	memcpy(tip, getMatchLocation(trackingLocations), sizeof(int) * 2);
+	//if ((tip[0] > -1) && (tip[0] < X) && (tip[0] > -1) && (tip[1] < Y) && (tip[1] > -1)) {
+	if ((tip[0] > 0) && (tip[0] < X - 1) && (tip[0] > 0) && (tip[1] < Y - 1) && (tip[1] > 0)) {
 		frame.data[tip[1] * frame.step + tip[0] * 3] = 0;
 		frame.data[tip[1] * frame.step + tip[0] * 3 + 1] = 255;
 		frame.data[tip[1] * frame.step + tip[0] * 3 + 2] = 0;
@@ -469,12 +474,7 @@ Mat track(Mat frame) {
 		frame.data[(tip[1] - 1) * frame.step + (tip[0] - 1) * 3 + 2] = 0;
 	}
 
-	
-	
-	//return outFrame;
-	//return *outFrame;
-	//For the sake of debugging 
-	return frame;
+	delete [] trackingLocations;
 }
 
 Mat averageFrame(Mat buffer[3]) {
@@ -535,3 +535,27 @@ Mat averageFrame(Mat buffer[3]) {
 	//for the sake of debugging
 	return buffer[0];
 }
+
+/*
+Mat blackFrame(Mat frame) {
+	int threadCount = 1024;
+	int blocks = (X * Y - 1) / threadCount + 1;
+	if (blocks == 1)
+	{
+		threadCount = X * Y;
+	}
+	//Set up device variables
+	uint8_t *d_imgPtr;
+	cv::cuda::GpuMat d_newFrame;
+	d_newFrame.upload(frame);
+
+	//Allocate device memory
+	cudaMalloc((void **)&d_imgPtr, d_newFrame.rows*d_newFrame.step);
+	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
+	getRedKernel << <blocks, threadCount >> > (d_outFrame);
+	cudaDeviceSynchronize();
+	d_newFrame.download(frame);
+	//Free original frame pointer device memory
+	cudaFree(d_imgPtr);
+	d_newFrame.release();
+}*/
