@@ -46,7 +46,7 @@ class ParticleSystem {
 };
 
 Particle *updateParticles(Particle *container, int matchTip[2]);
-Mat addFlame(Mat frame, Mat fullFrame, Particle *container);
+void addFlame(Mat frame, Mat fullFrame, Particle *container);
 Particle *initialSetValues(Particle *container);
 
 const int MaxParticles = 1000;

@@ -10,10 +10,6 @@ using namespace cv::cuda;
 #include "Particle.h"
 
 #define WINDOW_TITLE "Window"
-//const int MaxParticles = 10000;
-//const int emissionsPerFrame = 100;
-//should be variable based on distance
-int matchWidth = 20;
 
 //Untseted approach to a quicksort
 bool operator<(Particle& x, Particle& y)
@@ -67,22 +63,8 @@ int main(int argc, char** argv) {
 
 	int bufferedFrameCount = 0;
 	Mat *frameBuffer = new Mat[3];
-	//int *MaxParticles;
-	//MaxParticles = (int*)malloc(sizeof(int));
-	//*MaxParticles = 10000;
 	Particle *particleContainer = (Particle*)malloc(sizeof(Particle) * MaxParticles);
 	int *trackingLocation = (int*)malloc(sizeof(int) * 2);
-	//access violation need to be malloced
-	//glm::vec3 pos = { 0.0f, 0.0f, 0.0f };
-	//glm::vec3 vel = { 0.0f, 0.0f, 0.0f };
-	//float pos[3] = { 0.0, 0.0, 0.0 };
-	//float vel[3] = { 0.0, 0.0, 0.0 };
-	//unsigned char colour[4] = { 0, 0, 0, 0 };
-	//float size = 1;
-	//angle and weight may be unnessecary for this particle system
-	//float angle = 0;
-	//float weight = 1;
-	//float life = 0;
 	*particleContainer = *initialSetValues(particleContainer);
 	namedWindow("frame", 1);
 	for (;;)
@@ -109,12 +91,11 @@ int main(int argc, char** argv) {
 		//Sort the particle list
 		std::sort(particleContainer, particleContainer + MaxParticles);
 		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
-		Mat frameCopy(WINDOW_HEIGHT, WINDOW_WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+		Mat flameFrame(WINDOW_HEIGHT, WINDOW_WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
 		*particleContainer = *updateParticles(particleContainer, trackingLocation);
 		//no need to sort before adding the flame as each particle can be tested in parrallel
-		Mat flameFrame = addFlame(frameCopy, frame, particleContainer);
-		//imshow("frame", flameFrame);
-		imshow("frame", frameCopy);
+		addFlame(flameFrame, frame, particleContainer);
+		imshow("frame", flameFrame);
 		if (waitKey(30) >= 0) break;
 		waitKey(1);
 		//}

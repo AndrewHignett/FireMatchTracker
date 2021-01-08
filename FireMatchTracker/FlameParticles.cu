@@ -10,42 +10,52 @@
 #include "matchTracker.h"
 #include "Particle.h"
 
-__global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame, int x, int y)
+__global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameFrame, cv::cuda::GpuMat fullFrame)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+	int x = WINDOW_WIDTH;
+	int y = WINDOW_HEIGHT;
 	if (threadId < x * y)
 	{
 		int row = threadId / x;
 		int column = threadId % x;
-		uint8_t pixelR = dilatedFrame.data[(row*dilatedFrame.step) + column * 3 + 2];
+		uint8_t pixelR = flameFrame.data[(row*flameFrame.step) + column * 3 + 2];
+		uint8_t pixelG = flameFrame.data[(row*flameFrame.step) + column * 3 + 1];
+		uint8_t pixelB = flameFrame.data[(row*flameFrame.step) + column * 3];
 
-		if (pixelR == 255)
+		bool allPixelsFire = false;
+		if ((pixelR + pixelG + pixelB) > 0)
 		{
-			bool allPixelsRed = true;
+			allPixelsFire = true;
 			for (int i = -2; i < 3; i++)
 			{
 				for (int j = -2; j < 3; j++)
 				{
 					if ((row + i > -1) && (row + i < y) && (column + j > -1) && (column + j < x))
 					{
-						if (dilatedFrame.data[((row + i)*dilatedFrame.step) + (column + j) * 3 + 2] == 0)
+						if ((flameFrame.data[((row + i)*flameFrame.step) + (column + j) * 3 + 2] == 0)&& (flameFrame.data[((row + i)*flameFrame.step) + (column + j) * 3 + 1] == 0)&& (flameFrame.data[((row + i)*flameFrame.step) + (column + j) * 3] == 0))
 						{
-							allPixelsRed = false;
+							allPixelsFire = false;
 						}
 					}
 				}
 			}
-			if (allPixelsRed)
-			{
-				out.data[(row*out.step) + column * 3] = 0;
-				out.data[(row*out.step) + column * 3 + 1] = 255;
-				out.data[(row*out.step) + column * 3 + 2] = 0;
-			}
+		}
+		if (allPixelsFire)
+		{
+			out.data[(row*out.step) + column * 3] = pixelB;
+			out.data[(row*out.step) + column * 3 + 1] = pixelG;
+			out.data[(row*out.step) + column * 3 + 2] = pixelR;
+		}
+		else {
+			out.data[(row*out.step) + column * 3 + 2] = fullFrame.data[(row*fullFrame.step) + column * 3 + 2];
+			out.data[(row*out.step) + column * 3 + 1] = fullFrame.data[(row*fullFrame.step) + column * 3 + 1];
+			out.data[(row*out.step) + column * 3] = fullFrame.data[(row*fullFrame.step) + column * 3];
 		}
 	}
 }
 
-__global__ void applyDilation(cv::cuda::GpuMat out, cv::cuda::GpuMat fullFrame, int *particleCount) {
+__global__ void applyDilation(cv::cuda::GpuMat out, int *particleCount) {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	int x = WINDOW_WIDTH;
 	int y = WINDOW_HEIGHT;
@@ -65,14 +75,17 @@ __global__ void applyDilation(cv::cuda::GpuMat out, cv::cuda::GpuMat fullFrame, 
 			
 		}	
 		else {
-			out.data[(row*out.step) + column * 3 + 2] = fullFrame.data[(row*fullFrame.step) + column * 3 + 2];
-			out.data[(row*out.step) + column * 3 + 1] = fullFrame.data[(row*fullFrame.step) + column * 3 + 1];
-			out.data[(row*out.step) + column * 3] = fullFrame.data[(row*fullFrame.step) + column * 3];
+			out.data[(row*out.step) + column * 3 + 2] = 0;
+			out.data[(row*out.step) + column * 3 + 1] = 0;
+			out.data[(row*out.step) + column * 3] = 0;
 		}
 	}
 }
 
-//out must be a black frame
+/*
+flameFrame must start as a black frame
+alpha transparency needs to be taken into account, and added to the smoke part
+*/
 __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCount)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -170,7 +183,7 @@ __global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container) {
 	}
 }
 
-Mat addFlame(Mat frame, Mat fullFrame, Particle *container) {
+void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	int x = WINDOW_WIDTH;
 	int y = WINDOW_HEIGHT;
 	int threadCount = 1024;
@@ -203,10 +216,13 @@ Mat addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	Mat out(y, x, CV_8UC3, cv::Scalar(0, 0, 0));
 	uint8_t *d_outPtr;
 	uint8_t *d_fullFramePtr;
+	uint8_t *d_flameFramePtr;
 	cv::cuda::GpuMat d_out;
 	cv::cuda::GpuMat d_fullFrame;
+	cv::cuda::GpuMat d_flameFrame;
 	d_out.upload(out);
 	d_fullFrame.upload(fullFrame);
+	d_flameFrame.upload(out);
 	//int *d_x, *d_y, *d_particleCount;
 	int *d_particleCount;
 	//cudaMalloc((void**)&d_x, sizeof(int));
@@ -214,11 +230,11 @@ Mat addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaMalloc((void**)&d_particleCount, sizeof(int)*x*y*4);
 	cudaMalloc((void**)&d_outPtr, d_out.rows*d_out.step);
 	cudaMalloc((void**)&d_fullFramePtr, d_fullFrame.rows*d_fullFrame.step);
-	//cudaMemcpy(d_x, &x, sizeof(int), cudaMemcpyHostToDevice);
-	//cudaMemcpy(d_y, &y, sizeof(int), cudaMemcpyHostToDevice);
+	cudaMalloc((void**)&d_flameFramePtr, d_flameFrame.rows*d_flameFrame.step);
 	cudaMemcpy(d_particleCount, particleCount, sizeof(int)*x*y*4, cudaMemcpyHostToDevice);
 	cudaMemcpyAsync(d_outPtr, d_out.ptr<uint8_t>(), d_out.rows*d_out.step, cudaMemcpyDeviceToDevice);
 	cudaMemcpyAsync(d_fullFramePtr, d_fullFrame.ptr<uint8_t>(), d_fullFrame.rows*d_fullFrame.step, cudaMemcpyDeviceToDevice);
+	cudaMemcpyAsync(d_flameFramePtr, d_flameFrame.ptr<uint8_t>(), d_flameFrame.rows*d_flameFrame.step, cudaMemcpyDeviceToDevice);
 
 	threadCount = 1024;
 	blocks = (x * y - 1) / threadCount + 1;
@@ -231,7 +247,10 @@ Mat addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaDeviceSynchronize();
 
 
-	applyDilation << <blocks, threadCount >> > (d_out, d_fullFrame, d_particleCount);
+	applyDilation << <blocks, threadCount >> > (d_flameFrame, d_particleCount);
+	cudaDeviceSynchronize();
+
+	genericErodeKernel<<<blocks, threadCount>>>(d_out, d_flameFrame, d_fullFrame);
 	cudaDeviceSynchronize();
 	d_out.download(frame);
 	//Free original frame pointer device memory
@@ -241,15 +260,14 @@ Mat addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	d_out.release();
 	cudaFree(d_fullFramePtr);
 	d_fullFrame.release();
+	cudaFree(d_flameFramePtr);
+	d_flameFrame.release();
 	cudaFree(d_particleCount);
 	//free the device memory for the particle container
 	cudaFree(d_container);
 
 	//free host memory
 	free(particleCount);
-
-	//for debug only
-	return frame;
 }
 
 __global__ void particleKernel(Particle *container, int *matchTip, curandState_t *states){
