@@ -109,10 +109,10 @@ int main(int argc, char** argv) {
 		//Sort the particle list
 		std::sort(particleContainer, particleContainer + MaxParticles);
 		//merge_sort(ParticleContainer, 0, MaxParticles - 1);
-		*particleContainer = *updateParticles(particleContainer, trackingLocation);
 		Mat frameCopy(WINDOW_HEIGHT, WINDOW_WIDTH, CV_8UC3, cv::Scalar(0, 0, 0));
+		*particleContainer = *updateParticles(particleContainer, trackingLocation);
 		//no need to sort before adding the flame as each particle can be tested in parrallel
-		Mat flameFrame = addFlame(frameCopy, particleContainer);
+		Mat flameFrame = addFlame(frameCopy, frame, particleContainer);
 		//imshow("frame", flameFrame);
 		imshow("frame", frameCopy);
 		if (waitKey(30) >= 0) break;
