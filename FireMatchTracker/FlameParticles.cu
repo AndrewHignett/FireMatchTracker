@@ -66,7 +66,7 @@ __global__ void applyDilation(cv::cuda::GpuMat out, int *particleCount, int *alp
 		if (particleCount[row * 5 * x + 5 * column + 4] > 0) {
 			int particles = particleCount[row * 5 * x + 5 * column + 4];
 			//particle count is sometimes not a valid number and it results in the pixel colours being above 255
-			while (((particleCount[row * 5 * x + 5 * column] / particles) > 255) || ((particleCount[row * 5 * x + 5 * column + 1] / particles) > 255)||((particleCount[row * 5 * x + 5 * column + 2] / particles) > 255) || ((particleCount[row * 5 * x + 5 * column + 4] / particles) > 255)) {
+			while (((particleCount[row * 5 * x + 5 * column] / particles) > 255) || ((particleCount[row * 5 * x + 5 * column + 1] / particles) > 255)||((particleCount[row * 5 * x + 5 * column + 2] / particles) > 255) || ((particleCount[row * 5 * x + 5 * column + 3] / particles) > 255)) {
 				particles += 1;
 			}
 			for (int k = 0; k < 3; k++) {
