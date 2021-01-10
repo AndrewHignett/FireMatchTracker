@@ -13,12 +13,10 @@
 __global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameFrame, cv::cuda::GpuMat fullFrame, int *alphas)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	int x = WINDOW_WIDTH;
-	int y = WINDOW_HEIGHT;
-	if (threadId < x * y)
+	if (threadId < X * Y)
 	{
-		int row = threadId / x;
-		int column = threadId % x;
+		int row = threadId / X;
+		int column = threadId % X;
 		uint8_t pixelR = flameFrame.data[(row*flameFrame.step) + column * 3 + 2];
 		uint8_t pixelG = flameFrame.data[(row*flameFrame.step) + column * 3 + 1];
 		uint8_t pixelB = flameFrame.data[(row*flameFrame.step) + column * 3];
@@ -31,7 +29,7 @@ __global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameF
 			{
 				for (int j = -2; j < 3; j++)
 				{
-					if ((row + i > -1) && (row + i < y) && (column + j > -1) && (column + j < x))
+					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 					{
 						if ((flameFrame.data[((row + i)*flameFrame.step) + (column + j) * 3 + 2] == 0)&& (flameFrame.data[((row + i)*flameFrame.step) + (column + j) * 3 + 1] == 0)&& (flameFrame.data[((row + i)*flameFrame.step) + (column + j) * 3] == 0))
 						{
@@ -43,9 +41,9 @@ __global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameF
 		}
 		if (allPixelsFire)
 		{
-			out.data[(row*out.step) + column * 3] = pixelB * float(alphas[row * x + column])/255 + (1 - float(alphas[row * x + column])/255) * fullFrame.data[(row*fullFrame.step) + column * 3];
-			out.data[(row*out.step) + column * 3 + 1] = pixelG * float(alphas[row * x + column])/255 + (1 - float(alphas[row * x + column])/255) * fullFrame.data[(row*fullFrame.step) + column * 3 + 1];
-			out.data[(row*out.step) + column * 3 + 2] = pixelR * float(alphas[row * x + column])/255 + (1 - float(alphas[row * x + column])/255) * fullFrame.data[(row*fullFrame.step) + column * 3 + 2];
+			out.data[(row*out.step) + column * 3] = pixelB * float(alphas[row * X + column])/255 + (1 - float(alphas[row * X + column])/255) * fullFrame.data[(row*fullFrame.step) + column * 3];
+			out.data[(row*out.step) + column * 3 + 1] = pixelG * float(alphas[row * X + column])/255 + (1 - float(alphas[row * X + column])/255) * fullFrame.data[(row*fullFrame.step) + column * 3 + 1];
+			out.data[(row*out.step) + column * 3 + 2] = pixelR * float(alphas[row * X + column])/255 + (1 - float(alphas[row * X + column])/255) * fullFrame.data[(row*fullFrame.step) + column * 3 + 2];
 		}
 		else {
 			out.data[(row*out.step) + column * 3 + 2] = fullFrame.data[(row*fullFrame.step) + column * 3 + 2];
@@ -57,45 +55,40 @@ __global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameF
 
 __global__ void applyDilation(cv::cuda::GpuMat out, int *particleCount, int *alphas) {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	int x = WINDOW_WIDTH;
-	int y = WINDOW_HEIGHT;
-	if (threadId < x * y)
+	if (threadId < X * Y)
 	{
-		int row = threadId / x;
-		int column = threadId % x;
-		if (particleCount[row * 5 * x + 5 * column + 4] > 0) {
-			int particles = particleCount[row * 5 * x + 5 * column + 4];
-			//particle count is sometimes not a valid number and it results in the pixel colours being above 255
-			while (((particleCount[row * 5 * x + 5 * column] / particles) > 255) || ((particleCount[row * 5 * x + 5 * column + 1] / particles) > 255)||((particleCount[row * 5 * x + 5 * column + 2] / particles) > 255) || ((particleCount[row * 5 * x + 5 * column + 3] / particles) > 255)) {
+		int row = threadId / X;
+		int column = threadId % X;
+		if (particleCount[row * 5 * X + 5 * column + 4] > 0) {
+			int particles = particleCount[row * 5 * X + 5 * column + 4];
+			//particle count is sometimes not a valid number and it results in the pixel colours or alpha being above 255
+			while (((particleCount[row * 5 * X + 5 * column] / particles) > 255) || ((particleCount[row * 5 * X + 5 * column + 1] / particles) > 255)||((particleCount[row * 5 * X + 5 * column + 2] / particles) > 255) || ((particleCount[row * 5 * X + 5 * column + 3] / particles) > 255)) {
 				particles += 1;
 			}
 			for (int k = 0; k < 3; k++) {
-				out.data[(row*out.step) + column * 3 + 2 - k] = particleCount[row * 5 * x + 5 * column + k] / particles;
+				out.data[(row*out.step) + column * 3 + 2 - k] = particleCount[row * 5 * X + 5 * column + k] / particles;
 			}
-			alphas[row * x + column] = particleCount[row * 5 * x + 5 * column + 3] / particles;
+			alphas[row * X + column] = particleCount[row * 5 * X + 5 * column + 3] / particles;
 		}	
 		else {
 			out.data[(row*out.step) + column * 3 + 2] = 0;
 			out.data[(row*out.step) + column * 3 + 1] = 0;
 			out.data[(row*out.step) + column * 3] = 0;
-			alphas[row * x + column] = 0;
+			alphas[row * X + column] = 0;
 		}
 	}
 }
 
 /*
 flameFrame must start as a black frame
-alpha transparency needs to be taken into account, and added to the smoke part
 */
 __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCount, int *alphas)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	int x = WINDOW_WIDTH;
-	int y = WINDOW_HEIGHT;
-	if (threadId < x * y)
+	if (threadId < X * Y)
 	{
-		int row = threadId / x;
-		int column = threadId % x;
+		int row = threadId / X;
+		int column = threadId % X;
 		uint8_t pixelR = flameFrame.data[(row*flameFrame.step) + column * 3 + 2];
 		uint8_t pixelG = flameFrame.data[(row*flameFrame.step) + column * 3 + 1];
 		uint8_t pixelB = flameFrame.data[(row*flameFrame.step) + column * 3];
@@ -108,14 +101,14 @@ __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCo
 				for (int j = -6; j < 7; j++)
 				//for (int j = -4; j < 5; j++)
 				{
-					if ((row + i > -1) && (row + i < y) && (column + j > -1) && (column + j < x))
+					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 					{
-						particleCount[(row + i) * 5 * x + 5 * (column + j)] += pixelR;
-						particleCount[(row + i) * 5 * x + 5 * (column + j) + 1] += pixelG;
-						particleCount[(row + i) * 5 * x + 5 * (column + j) + 2] += pixelB;
-						particleCount[(row + i) * 5 * x + 5 * (column + j) + 3] += alphas[row * x + column];
+						particleCount[(row + i) * 5 * X + 5 * (column + j)] += pixelR;
+						particleCount[(row + i) * 5 * X + 5 * (column + j) + 1] += pixelG;
+						particleCount[(row + i) * 5 * X + 5 * (column + j) + 2] += pixelB;
+						particleCount[(row + i) * 5 * X + 5 * (column + j) + 3] += alphas[row * X + column];
 						//store count of particles used in this given pixel
-						particleCount[(row + i) * 5 * x + 5 * (column + j) + 4] += 1;
+						particleCount[(row + i) * 5 * X + 5 * (column + j) + 4] += 1;
 					}
 				}
 			}
@@ -125,7 +118,7 @@ __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCo
 }
 
 __host__ __device__
-void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], float sizeI, float angleI, float weightI, float lifeI) {
+void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], float lifeI) {
 	//position = pos;
 	//velocity = vel;
 	position[0] = pos[0];
@@ -139,10 +132,6 @@ void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], fl
 	g = colour[1];
 	b = colour[2];
 	a = colour[3];
-	//size may be irrelevant, if deeling with sub-pixel particles, however, this may result in a flame with gaps in
-	size = sizeI;
-	angle = angleI;
-	weight = weightI;
 	//particle life span must be longer as the particle's initial location approaches the match tracked location
 	//life starts as a number (e.g. 4), and the particle is inactive when it's <= 0
 	//all particles should be initialised to a life of 0
@@ -166,30 +155,24 @@ void Particle::updateParticle(float deltaT) {
 
 __global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container, int *alphas) {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	int x = WINDOW_WIDTH;
 	if (threadId < MaxParticles)
 	{
-		//printf("%d %d %f\n", MaxParticles, threadId, container[threadId].getLife());
 		if ((threadId < MaxParticles) && (container[threadId].getLife() > 0)) {
-			//int row = threadId / X;
-			//int column = threadId % X;
 			float *xyz = container[threadId].getPosition();
 			int row = xyz[1];
 			int column = xyz[0];
 			//BGR pixel values
-			if ((row >= 0) && (column >= 0) && (row < WINDOW_HEIGHT) && (column < WINDOW_WIDTH)) {
+			if ((row >= 0) && (column >= 0) && (row < Y) && (column < X)) {
 				frame.data[(row*frame.step) + column * 3] = container[threadId].getBlue();
 				frame.data[(row*frame.step) + column * 3 + 1] = container[threadId].getGreen();
 				frame.data[(row*frame.step) + column * 3 + 2] = container[threadId].getRed();
-				alphas[row * x + column] = container[threadId].getAlpha();
+				alphas[row * X + column] = container[threadId].getAlpha();
 			}
 		}
 	}
 }
 
 void addFlame(Mat frame, Mat fullFrame, Particle *container) {
-	int x = WINDOW_WIDTH;
-	int y = WINDOW_HEIGHT;
 	int threadCount = 1024;
 	int blocks = (MaxParticles - 1) / threadCount + 1;
 	if (blocks == 1)
@@ -204,19 +187,19 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 
 	uint8_t *d_imgPtr;
 	int *alphas;
-	alphas = (int*)malloc(sizeof(int)*x*y);
-	memset(alphas, 0, sizeof(int)*x*y);
+	alphas = (int*)malloc(sizeof(int)*X*Y);
+	memset(alphas, 0, sizeof(int)*X*Y);
 	int *d_alphas;
-	Mat newFrame(y, x, CV_8UC3, cv::Scalar(0, 0, 0));
+	Mat newFrame(Y, X, CV_8UC3, cv::Scalar(0, 0, 0));
 	cv::cuda::GpuMat d_newFrame;
 	//d_newFrame.upload(frame);
 	d_newFrame.upload(newFrame);
 
 	//Allocate device memory
 	cudaMalloc((void **)&d_imgPtr, d_newFrame.rows*d_newFrame.step);
-	cudaMalloc((void**)&d_alphas, sizeof(int)*x*y);
+	cudaMalloc((void**)&d_alphas, sizeof(int)*X*Y);
 	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
-	cudaMemcpy(d_alphas, alphas, sizeof(int)*x*y, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_alphas, alphas, sizeof(int)*X*Y, cudaMemcpyHostToDevice);
 	flameKernel << <blocks, threadCount >> > (d_newFrame, d_container, d_alphas);
 	cudaDeviceSynchronize();
 
@@ -224,24 +207,24 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaFree(d_container);
 	
 	int *particleCount;
-	particleCount = (int*)malloc(sizeof(int)*x*y*5);
-	memset(particleCount, 0, sizeof(int)*x*y*5);
+	particleCount = (int*)malloc(sizeof(int)*X*Y*5);
+	memset(particleCount, 0, sizeof(int)*X*Y*5);
 	uint8_t *d_fullFramePtr;
 	cv::cuda::GpuMat d_fullFrame;
 	
 	d_fullFrame.upload(fullFrame);
 	int *d_particleCount;
-	cudaMalloc((void**)&d_particleCount, sizeof(int)*x*y*5);
+	cudaMalloc((void**)&d_particleCount, sizeof(int)*X*Y*5);
 	cudaMalloc((void**)&d_fullFramePtr, d_fullFrame.rows*d_fullFrame.step);
-	cudaMemcpy(d_particleCount, particleCount, sizeof(int)*x*y*5, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_particleCount, particleCount, sizeof(int)*X*Y*5, cudaMemcpyHostToDevice);
 	cudaMemcpyAsync(d_fullFramePtr, d_fullFrame.ptr<uint8_t>(), d_fullFrame.rows*d_fullFrame.step, cudaMemcpyDeviceToDevice);
 	
 
 	threadCount = 1024;
-	blocks = (x * y - 1) / threadCount + 1;
+	blocks = (X * Y - 1) / threadCount + 1;
 	if (blocks == 1)
 	{
-		threadCount = x * y;
+		threadCount = X * Y;
 	}
 
 	genericDilateKernel << <blocks, threadCount >> > (d_newFrame, d_particleCount, d_alphas);
@@ -251,7 +234,7 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaFree(d_imgPtr);
 	d_newFrame.release();
 
-	Mat out(y, x, CV_8UC3, cv::Scalar(0, 0, 0));
+	Mat out(Y, X, CV_8UC3, cv::Scalar(0, 0, 0));
 	//allocate flame frame to host and device memory
 	uint8_t *d_flameFramePtr;
 	cv::cuda::GpuMat d_flameFrame;
@@ -261,6 +244,9 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 
 	applyDilation << <blocks, threadCount >> > (d_flameFrame, d_particleCount, d_alphas);
 	cudaDeviceSynchronize();
+
+	cudaFree(d_particleCount);
+	free(particleCount);
 
 	cv::cuda::GpuMat d_out;
 	uint8_t *d_outPtr;
@@ -278,22 +264,10 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	d_fullFrame.release();
 	cudaFree(d_flameFramePtr);
 	d_flameFrame.release();
-	cudaFree(d_particleCount);
 	cudaFree(d_alphas);
 
 	//free host memory
-	free(particleCount);
 	free(alphas);
-
-
-	cudaError_t err = cudaGetLastError();
-
-	if (err != cudaSuccess)
-	{
-		printf("CUDA Error: %s\n", cudaGetErrorString(err));
-
-		// Possibly: exit(-1) if program cannot continue....
-	}
 }
 
 __global__ void particleKernel(Particle *container, int *matchTip, curandState_t *states){
@@ -305,30 +279,25 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 			//update all active particles
 			//some may be reduced to a life below 0
 			float *pos = container[threadId].getPosition();
-			//float vel[3] = { 0.0, -300.0, 0.0 };
 			float *vel = container[threadId].getVelocity();
 			pos[1] += vel[1]*FrameTime;
-			float size = 1;
-			//angle and weight may be unnessecary for this particle system
-			float angle = 0;
-			float weight = 1;
 			float life = container[threadId].getLife() + FrameTime;
 			//unsigned char colour[4] = { container[threadId].getRed(), 85*log10f(32/life), life * 2 * 255, container[threadId].getAlpha() };
 			unsigned char colour[4] = { container[threadId].getRed(), 85 * log10f(32 / life), container[threadId].getBlue(), 255};
 			//give the particles a max life time
 			if (life < 0.5){
 				
-				container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+				container[threadId].setValues(pos, vel, colour, life);
 			}
 			else if (life < 0.6) {
 				//life*life*life*life*life may be faster than std::power(life, 5)
 				unsigned char colour[4] = { 144, 144, 144, 8/(life*life*life*life*life)};
-				container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+				container[threadId].setValues(pos, vel, colour, life);
 			}
 			else {
 				//unsigned char colour[4] = { container[threadId].getRed(), 85 * log10f(32 / life), container[threadId].getBlue(), container[threadId].getAlpha() };
 				unsigned char colour[4] = { 255, 255, 0, 255 };
-				container[threadId].setValues(pos, vel, colour, size, angle, weight, 0);
+				container[threadId].setValues(pos, vel, colour, 0);
 			}
 		}
 		else if ((threadId < EmissionsPerFrame)&&(matchTip[0] > -1)) {
@@ -346,34 +315,23 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 				velY = -100;
 			}
 			float pos[3] = { randomStartPosX, randomStartPosY, 0.0 };
-			//float vel[3] = { 0.0, -300.0, 0.0 };
 			float vel[3] = { 0.0, velY, 0.0 };
 			unsigned char colour[4] = { container[threadId].getRed(), container[threadId].getGreen(), container[threadId].getBlue(), container[threadId].getAlpha() };
-			float size = 1;
-			//angle and weight may be unnessecary for this particle system
-			float angle = 0;
-			float weight = 1;
 			float life = FrameTime;
-			container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+			container[threadId].setValues(pos, vel, colour, life);
 		}
 	}
 }
 
 __global__ void initialParticleKernel(Particle *container) {
-	//printf("%d\n", MaxParticles);
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < MaxParticles)
 	{
 		float pos[3] = { 0.0, 0.0, 0.0 };
 		float vel[3] = { 0.0, -300.0, 0.0 };
 		unsigned char colour[4] = { 255, 255, 0, 255 };
-		float size = 1;
-		//angle and weight may be unnessecary for this particle system
-		float angle = 0;
-		float weight = 1;
 		float life = 0;
-		//printf("%f\n", life);
-		container[threadId].setValues(pos, vel, colour, size, angle, weight, life);
+		container[threadId].setValues(pos, vel, colour, life);
 	}
 }
 
@@ -412,13 +370,12 @@ Particle *updateParticles(Particle *container, int matchTip[2]) {
 	cudaMemcpy(d_matchTip, matchTip, sizeof(int) * 2, cudaMemcpyHostToDevice);
 	particleKernel<<<blocks, threadCount>>>(d_container, d_matchTip, d_randStates);
 	
-
 	cudaDeviceSynchronize;
 	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
 	cudaFree(d_container);
 	cudaFree(d_matchTip);
 	cudaFree(d_randStates);
-	//for debug only
+
 	return container;
 }
 
@@ -434,23 +391,11 @@ Particle *initialSetValues(Particle *container) {
 	Particle *d_container;
 	//allocate device memory for the particle container
 	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
-	//transfer from host to device memory
-	//cudaMemcpy(d_container, container, sizeof(Particle) * MaxParticles, cudaMemcpyHostToDevice);
-	//allocate device memory for the maxParticle count
-	//cudaMalloc((void**)&d_maxParticles, sizeof(int));
-	//transfer from host to device memory
-	//cudaMemcpy(d_maxParticles, maxParticles, sizeof(int), cudaMemcpyHostToDevice);
 	initialParticleKernel << <blocks, threadCount >> > (d_container);
-	//cudaError_t error = cudaGetLastError();
-	//if (error != cudaSuccess){
-	//	printf("%s\n", cudaGetErrorString(error));
-	//}
 	cudaDeviceSynchronize;
 	//copy device memory for the particle container back to host memory
 	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
-	//free(containerCopy);
-	//free(maxParticlesCopy);
 	cudaFree(d_container);
-	//for debug only
+
 	return container;
 }
