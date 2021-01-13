@@ -14,8 +14,14 @@ using namespace cv;
 
 #ifndef _matchTracker_
 #define _matchTracker_
+/*
+Define function template for the track function, for tracking the match tip
+*/
 void track(Mat frame, int *tip);
 
+/*
+Declared dimensions of the window captured through the webcam
+*/
 #define X 1280
 #define Y 720
 #endif

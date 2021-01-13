@@ -96,10 +96,8 @@ __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCo
 		if ((pixelR + pixelG + pixelB) > 0)
 		{
 			for (int i = -6; i < 7; i++)
-			//for (int i = -4; i < 5; i++)
 			{
 				for (int j = -6; j < 7; j++)
-				//for (int j = -4; j < 5; j++)
 				{
 					if ((row + i > -1) && (row + i < Y) && (column + j > -1) && (column + j < X))
 					{
@@ -119,15 +117,12 @@ __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCo
 
 __host__ __device__
 void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], float lifeI) {
-	//position = pos;
-	//velocity = vel;
 	position[0] = pos[0];
 	position[1] = pos[1];
 	position[2] = pos[2];
 	velocity[0] = vel[0];
 	velocity[1] = vel[1];
 	velocity[2] = vel[2];
-	//acceleration = acc;
 	r = colour[0];
 	g = colour[1];
 	b = colour[2];
@@ -192,7 +187,6 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	int *d_alphas;
 	Mat newFrame(Y, X, CV_8UC3, cv::Scalar(0, 0, 0));
 	cv::cuda::GpuMat d_newFrame;
-	//d_newFrame.upload(frame);
 	d_newFrame.upload(newFrame);
 
 	//Allocate device memory
@@ -282,7 +276,6 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 			float *vel = container[threadId].getVelocity();
 			pos[1] += vel[1]*FrameTime;
 			float life = container[threadId].getLife() + FrameTime;
-			//unsigned char colour[4] = { container[threadId].getRed(), 85*log10f(32/life), life * 2 * 255, container[threadId].getAlpha() };
 			unsigned char colour[4] = { container[threadId].getRed(), 85 * log10f(32 / life), container[threadId].getBlue(), 255};
 			//give the particles a max life time
 			if (life < 0.5){
@@ -295,7 +288,6 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 				container[threadId].setValues(pos, vel, colour, life);
 			}
 			else {
-				//unsigned char colour[4] = { container[threadId].getRed(), 85 * log10f(32 / life), container[threadId].getBlue(), container[threadId].getAlpha() };
 				unsigned char colour[4] = { 255, 255, 0, 255 };
 				container[threadId].setValues(pos, vel, colour, 0);
 			}

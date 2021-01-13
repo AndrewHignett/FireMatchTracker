@@ -97,12 +97,8 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 			int centreX = (maxX - minX) / 2 + minX;
 			int centreY = (maxY - minY) / 2 + minY;
 			trackedFrame.data[(centreY*trackedFrame.step) + centreX * 3 + 2] = 255;
-			//trackingLocations[1 + threadId/100] = centreX;
-			//trackingLocations[0].insert({ centreX, centreY });
-			//trackingLocations[2 + threadId/100] = centreY;
 		}
 	}
-	//__syncthreads();
 }
 
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
@@ -151,7 +147,6 @@ __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 
 		if (pixelR == 255)
 		{
-			//for (int i = -8; i < 9; i++)
 			for (int i = -6; i < 7; i++)
 			{
 				for (int j = -6; j < 7; j++)
@@ -322,25 +317,13 @@ void track(Mat frame, int *tip) {
 	//Allocate new device memory
 	cudaMalloc((void**)&d_trackedFramePtr, d_trackedFrame.rows*d_trackedFrame.step);
 	cudaMemcpyAsync(d_trackedFramePtr, d_trackedFrame.ptr<uint8_t>(), d_trackedFrame.rows*d_trackedFrame.step, cudaMemcpyDeviceToDevice);
-	//cudaMalloc((void**)&d_trackingLocations, 2 * (X / 20) * (Y / 20) * sizeof(int));
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_erodedFrame);
-	/*cudaError_t error2 = cudaGetLastError();
-	if (error2 != cudaSuccess) {
-		printf("2. Error: %s\n", cudaGetErrorString(error2));
-	}*/
 	cudaDeviceSynchronize();
 
 	//Free erodedFrame pointer device memory
 	cudaFree(d_erodedPtr);
 	d_erodedFrame.release();
-
-	//cudaMemcpy(trackingLocations, d_trackingLocations, 2 * (X/20) * (Y/20) * sizeof(int), cudaMemcpyDeviceToHost);
-	//print(trackingLocations);
-
-	//preventing memory leaks, in the wrong positon right now, purposely
-	//free(trackingLocations);
-	//cudaFree(d_trackingLocations);
 
 	Mat trackedFrame;
 	d_trackedFrame.download(trackedFrame);
@@ -359,7 +342,6 @@ void track(Mat frame, int *tip) {
 	d_trackedFrame.release();
 	trackedFrame.release();
 
-	//tip = getMatchLocation(trackingLocations);
 	memcpy(tip, getMatchLocation(trackingLocations), sizeof(int) * 2);
 	//uncomment for adding tracking marker to the frame
 	/*
@@ -393,6 +375,5 @@ void track(Mat frame, int *tip) {
 		frame.data[(tip[1] - 1) * frame.step + (tip[0] - 1) * 3 + 2] = 0;
 	}
 	*/
-
 	delete [] trackingLocations;
 }

@@ -30,10 +30,12 @@ int main(int argc, char** argv) {
 	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
 	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
 
+	//Allocate memory to the array of particles to make up the flame
 	Particle *particleContainer = (Particle*)malloc(sizeof(Particle) * MaxParticles);
 	int *trackingLocation = (int*)malloc(sizeof(int) * 2);
 	*particleContainer = *initialSetValues(particleContainer);
 	namedWindow("Match Tracker", 1);
+	//infinite loop capturing frames
 	for (;;)
 	{
 		Mat frame;
