@@ -1,6 +1,4 @@
 #pragma once
-#include "matchTracker.h"
-#include <cuda_runtime.h>
 
 #ifndef _Particle_
 #define _Particle_
@@ -15,8 +13,6 @@ class Particle {
 public:
 	__host__ __device__
 	void setValues(float[3], float[3], unsigned char[4], float);
-	__host__ __device__
-	void updateParticle(float);
 	__host__ __device__
 	float getLife() { return life; };
 	__host__ __device__
@@ -48,6 +44,6 @@ EmissionsPerFrame - the number of particles emitted from the match every frame
 */
 const int MaxParticles = 1000;
 __device__
-const float FrameTime = 0.033;
+const float FrameTime = 0.033f;
 const int EmissionsPerFrame = 25;
 #endif

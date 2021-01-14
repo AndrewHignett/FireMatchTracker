@@ -1,15 +1,10 @@
 #pragma once
 #include <opencv2/core.hpp>
+#include <opencv2/cudafilters.hpp>
+#include <device_launch_parameters.h>
+#include <cuda_runtime.h>
+using namespace cv::cuda;
 using namespace cv;
-#include <glew.h>
-#include <glfw3.h>
-#include <glm.hpp>
-#include <vec2.hpp>
-#include <vec3.hpp>
-#include <vec4.hpp>
-#include <mat4x4.hpp>
-#include <gtc\matrix_transform.hpp>
-#include <gtc\type_ptr.hpp>
 #include <algorithm>
 
 #ifndef _matchTracker_
@@ -22,6 +17,6 @@ void track(Mat frame, int *tip);
 /*
 Declared dimensions of the window captured through the webcam
 */
-#define X 1280
-#define Y 720
+const int X = 1280;
+const int Y = 720;
 #endif

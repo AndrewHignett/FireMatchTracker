@@ -1,9 +1,4 @@
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
 #include "matchTracker.h"
-#include <opencv2/cudaarithm.hpp>
-#include <opencv2/cudafilters.hpp>
-#include "opencv2/cudaimgproc.hpp"
 #include <set>
 using namespace cv::cuda;
 
@@ -259,9 +254,6 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 	return matchTip;
 }
 
-
-//any reference to editing the final frame can be removed
-//Mat track(Mat frame) {
 void track(Mat frame, int *tip) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;

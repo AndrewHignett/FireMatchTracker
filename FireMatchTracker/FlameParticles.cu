@@ -1,12 +1,7 @@
 #include <time.h>
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-#include <opencv2/cudaarithm.hpp>
-#include <opencv2/cudafilters.hpp>
 #include <curand.h>
 #include <curand_kernel.h>
 #include <math.h>
-#include "opencv2/cudaimgproc.hpp"
 #include "matchTracker.h"
 #include "Particle.h"
 
@@ -131,21 +126,6 @@ void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], fl
 	//life starts as a number (e.g. 4), and the particle is inactive when it's <= 0
 	//all particles should be initialised to a life of 0
 	life = lifeI;
-}
-
-//Update the state parameters of the particle based off it's acceleration, initial velocity and position
-__host__ __device__
-void Particle::updateParticle(float deltaT) {
-	//update the values for this particle
-	//postion =
-	//velocity =
-	//acceleration probably wont change, intiialise as a standard acceleration (in 3d, the acceleration must be for the 3d coordinates and then
-	//appropriately converted to the 2D pixel coordinates)
-	//acceleration is ignored, and instead just a fixed velocity could be used
-	//acceleration =
-	//life = 
-	//Later, update colour based roughly off life span to emulate smoke or edge colouring of the fire
-	//if the life is above the particle lifespan, then remove particle by resetting start inital particle attributes
 }
 
 __global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container, int *alphas) {

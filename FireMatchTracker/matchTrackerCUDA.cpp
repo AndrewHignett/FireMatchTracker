@@ -27,8 +27,8 @@ int main(int argc, char** argv) {
 	VideoCapture cap(0); // open the default camera
 	if (!cap.isOpened())  // check if we succeeded
 		return -1;
-	cap.set(CV_CAP_PROP_FRAME_WIDTH, 1280);
-	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 720);
+	cap.set(CV_CAP_PROP_FRAME_WIDTH, X);
+	cap.set(CV_CAP_PROP_FRAME_HEIGHT, Y);
 
 	//Allocate memory to the array of particles to make up the flame
 	Particle *particleContainer = (Particle*)malloc(sizeof(Particle) * MaxParticles);
