@@ -8,38 +8,32 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 {
 	//detect object size here
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-	int row = threadId / X;
-	int column = threadId % X;
-	if (threadId < X * Y) {	
-		trackedFrame.data[(row*trackedFrame.step) + column * 3] = 0;
-		trackedFrame.data[(row*trackedFrame.step) + column * 3 + 1] = 0;
-		trackedFrame.data[(row*trackedFrame.step) + column * 3 + 2] = 0;
-	}
 	if ((threadId < X * Y) && ((threadId/X)%10 == 0) && ((threadId % X) % 10 == 0))
 	{
+		int row = threadId / X;
+		int column = threadId % X;
 		uint8_t pixelGClean = cleanFrame.data[(row*cleanFrame.step) + column * 3 + 1];
 		if (pixelGClean == 255) {
 			int maxX = column;
 			int maxY = row;
 			int minX = column;
 			int minY = row;
-			bool traversable = true;
 			//Current array size is unstable, only works up until half the pixels being red (displayed as green), but saves memory and it's expected there's effort 
 			//to be as few red pixels as possible
-			int pixelList[2][(X * Y) / 200];
+			int pixelList[(X * Y) / 200];
 			bool pixelUsed[X / 10][Y / 10] = { 0 };
-			pixelList[0][0] = column;
-			pixelList[1][0] = row;
+			pixelList[0] = X * row + column;
 			int listLength = 1;
+			uint8_t pixelGcleanTest;
+			int x, y, xTemp, yTemp, temp;
 			while (listLength > 0) {
-				int x = pixelList[0][0];
-				int y = pixelList[1][0];
+				x = pixelList[0] % X;
+				y = pixelList[0] / X;
 				if (!pixelUsed[x / 10][y / 10]) {
 					if (x < X - 10) {
-						uint8_t pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x + 10) * 3 + 1];
+						pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x + 10) * 3 + 1];
 						if ((pixelGcleanTest == 255) && (!pixelUsed[(x + 10) / 10][y / 10])) {
-							pixelList[0][listLength] = x + 10;
-							pixelList[1][listLength] = y;
+							pixelList[listLength] = X * y + x + 10;
 							listLength++;
 							if (x + 10 > maxX) {
 								maxX = maxX + 10;
@@ -47,10 +41,9 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 						}
 					}
 					if (x > 9) {
-						uint8_t pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x - 10) * 3 + 1];
+						pixelGcleanTest = cleanFrame.data[y*cleanFrame.step + (x - 10) * 3 + 1];
 						if ((pixelGcleanTest == 255) && (!pixelUsed[(x - 10) / 10][y / 10])) {
-							pixelList[0][listLength] = x - 10;
-							pixelList[1][listLength] = y;
+							pixelList[listLength] = X * y + x - 10;
 							listLength++;
 							if (x - 10 < minX) {
 								minX = minX - 10;
@@ -58,10 +51,9 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 						}
 					}
 					if (y < Y - 10) {
-						uint8_t pixelGcleanTest = cleanFrame.data[(y + 10)*cleanFrame.step + x * 3 + 1];
+						pixelGcleanTest = cleanFrame.data[(y + 10)*cleanFrame.step + x * 3 + 1];
 						if ((pixelGcleanTest == 255) && (!pixelUsed[x / 10][(y + 10) / 10])) {
-							pixelList[0][listLength] = x;
-							pixelList[1][listLength] = y + 10;
+							pixelList[listLength] = X * (y + 10) + x;
 							listLength++;
 							if (y + 10 > maxY) {
 								maxY = maxY + 10;
@@ -69,10 +61,9 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 						}
 					}
 					if (y > 9) {
-						uint8_t pixelGcleanTest = cleanFrame.data[(y - 10)*cleanFrame.step + x * 3 + 1];
+						pixelGcleanTest = cleanFrame.data[(y - 10)*cleanFrame.step + x * 3 + 1];
 						if ((pixelGcleanTest == 255) && (!pixelUsed[x / 10][(y - 10) / 10])) {
-							pixelList[0][listLength] = x;
-							pixelList[1][listLength] = y - 10;
+							pixelList[listLength] = X * (y - 10) + x;
 							listLength++;
 							if (y - 10 < minY) {
 								minY = minY - 10;
@@ -81,12 +72,9 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 					}
 				}
 				pixelUsed[x / 10][y / 10] = true;
-				int xTemp = pixelList[0][listLength - 1];
-				int yTemp = pixelList[1][listLength - 1];
-				pixelList[0][listLength - 1] = pixelList[0][0];
-				pixelList[1][listLength - 1] = pixelList[1][0];
-				pixelList[0][0] = xTemp;
-				pixelList[1][0] = yTemp;
+				temp = pixelList[listLength - 1];
+				pixelList[listLength - 1] = pixelList[0];
+				pixelList[0] = temp;
 				listLength--;
 			}
 			int centreX = (maxX - minX) / 2 + minX;
@@ -205,9 +193,8 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 }
 
 
-int* getMatchLocation(std::set<int> *trackingLocations){
-	int matchTip[2];
-	matchTip[0] =  -1;
+void getMatchLocation(std::set<int> *trackingLocations, int *matchTip){
+	matchTip[0] = -1;
 	matchTip[1] = -1;
 	int trackA[2];
 	int trackB[2];
@@ -217,6 +204,7 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 	double aMagnitude;
 	double bMagnitude;
 	double ratio;
+	double oldRatio = 0.0;
 	double dotProduct;
 	//iterate over set to find all 3 location combinations, and find the most likely one to be the matchstick
 	for (auto i : *trackingLocations) {
@@ -236,14 +224,15 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 						b[1] = trackC[1] - trackB[1];
 						aMagnitude = sqrt(a[0] * a[0] + a[1] * a[1]);
 						bMagnitude = sqrt(b[0] * b[0] + b[1] * b[1]);
-						dotProduct = (a[0] * b[0] + a[1] * b[1]) / (aMagnitude * bMagnitude);
-						ratio = bMagnitude/aMagnitude;	
+						dotProduct = (a[0] * b[0] + a[1] * b[1]) / (aMagnitude * bMagnitude);	
 						if (dotProduct > 0.99) {
+							ratio = bMagnitude / aMagnitude;
 							//test if ratio is close to 1.5
-							if ((1.35 < ratio) && (ratio < 1.65)){
+							if ((1.35 < ratio) && (ratio < 1.65) && (abs(1.6 - ratio) < abs(1.6 - oldRatio))){
 								memcpy(matchTip, trackC, sizeof(int)*2);
 								matchTip[0] += b[0] / 10;
 								matchTip[1] += b[1] / 10;
+								oldRatio = ratio;
 							}
 						}
 					}
@@ -251,7 +240,6 @@ int* getMatchLocation(std::set<int> *trackingLocations){
 			}			
 		}
 	}
-	return matchTip;
 }
 
 void track(Mat frame, int *tip) {
@@ -270,7 +258,6 @@ void track(Mat frame, int *tip) {
 	cudaMalloc((void **)&d_outPtr, d_outFrame.rows*d_outFrame.step);
 	cudaMemcpyAsync(d_outPtr, d_outFrame.ptr<uint8_t>(), d_outFrame.rows*d_outFrame.step, cudaMemcpyDeviceToDevice);
 	getRedKernel << <blocks, threadCount >> > (d_outFrame);
-	cudaDeviceSynchronize();
 
 	uint8_t *d_dilatedPtr;
 	cv::cuda::GpuMat d_dilatedFrame;
@@ -281,7 +268,6 @@ void track(Mat frame, int *tip) {
 	cudaMemcpyAsync(d_dilatedPtr, d_dilatedFrame.ptr<uint8_t>(), d_dilatedFrame.rows*d_dilatedFrame.step, cudaMemcpyDeviceToDevice);
 
 	dilateKernel << <blocks, threadCount >> > (d_dilatedFrame, d_outFrame);
-	cudaDeviceSynchronize();
 	//Free outFrame pointer device memory
 	cudaFree(d_outPtr);
 	d_outFrame.release();
@@ -296,32 +282,35 @@ void track(Mat frame, int *tip) {
 
 	//convert the frame to be completely black to avoid weird artifacts
 	blackKernel << <blocks, threadCount >> > (d_erodedFrame);
-	cudaDeviceSynchronize();
 	erodeKernel << <blocks, threadCount >> > (d_erodedFrame, d_dilatedFrame);
-	cudaDeviceSynchronize();
 	//Free dilatedFrame pointer device memory
 	cudaFree(d_dilatedPtr);
 	d_dilatedFrame.release();
 
 	uint8_t *d_trackedFramePtr;
 	cv::cuda::GpuMat d_trackedFrame;
-	d_erodedFrame.copyTo(d_trackedFrame);
+	//declare a totally black image matrix
+	Mat newFrame(Y, X, CV_8UC3, cv::Scalar(0, 0, 0));
+	d_trackedFrame.upload(newFrame);
 	//Allocate new device memory
 	cudaMalloc((void**)&d_trackedFramePtr, d_trackedFrame.rows*d_trackedFrame.step);
 	cudaMemcpyAsync(d_trackedFramePtr, d_trackedFrame.ptr<uint8_t>(), d_trackedFrame.rows*d_trackedFrame.step, cudaMemcpyDeviceToDevice);
 	
 	detectObjectKernel<<<blocks, threadCount>>>(d_trackedFrame, d_erodedFrame);
-	cudaDeviceSynchronize();
 
 	//Free erodedFrame pointer device memory
 	cudaFree(d_erodedPtr);
 	d_erodedFrame.release();
 
+	cudaError_t error2 = cudaGetLastError();
+	if (error2 != cudaSuccess) {
+		printf("2. Error: %s\n", cudaGetErrorString(error2));
+	}
 	Mat trackedFrame;
 	d_trackedFrame.download(trackedFrame);
 	std::set<int> *trackingLocations = new std::set<int>[(X / 20)*(Y / 20)];
-	for (int i = 0; i < Y; i++) {
-		for (int j = 0; j < X; j++) {
+	for (int i = 0; i < Y; i = i + 5) {
+		for (int j = 0; j < X; j = j + 5) {
 			if (trackedFrame.data[(i*trackedFrame.step) + j * 3 + 2] == 255) {
 				int thisPixel = i * X + j;
 				trackingLocations[0].insert(thisPixel);
@@ -334,7 +323,7 @@ void track(Mat frame, int *tip) {
 	d_trackedFrame.release();
 	trackedFrame.release();
 
-	memcpy(tip, getMatchLocation(trackingLocations), sizeof(int) * 2);
+	getMatchLocation(trackingLocations, tip);
 	//uncomment for adding tracking marker to the frame
 	/*
 	if ((tip[0] > 0) && (tip[0] < X - 1) && (tip[0] > 0) && (tip[1] < Y - 1) && (tip[1] > 0)) {

@@ -175,7 +175,6 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaMemcpyAsync(d_imgPtr, d_newFrame.ptr<uint8_t>(), d_newFrame.rows*d_newFrame.step, cudaMemcpyDeviceToDevice);
 	cudaMemcpy(d_alphas, alphas, sizeof(int)*X*Y, cudaMemcpyHostToDevice);
 	flameKernel << <blocks, threadCount >> > (d_newFrame, d_container, d_alphas);
-	cudaDeviceSynchronize();
 
 	//free the device memory for the particle container
 	cudaFree(d_container);
@@ -202,7 +201,6 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	}
 
 	genericDilateKernel << <blocks, threadCount >> > (d_newFrame, d_particleCount, d_alphas);
-	cudaDeviceSynchronize();
 
 	//free new frame from device memory
 	cudaFree(d_imgPtr);
@@ -217,7 +215,6 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaMemcpyAsync(d_flameFramePtr, d_flameFrame.ptr<uint8_t>(), d_flameFrame.rows*d_flameFrame.step, cudaMemcpyDeviceToDevice);
 
 	applyDilation << <blocks, threadCount >> > (d_flameFrame, d_particleCount, d_alphas);
-	cudaDeviceSynchronize();
 
 	cudaFree(d_particleCount);
 	free(particleCount);
@@ -229,7 +226,6 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	cudaMemcpyAsync(d_outPtr, d_out.ptr<uint8_t>(), d_out.rows*d_out.step, cudaMemcpyDeviceToDevice);
 
 	genericErodeKernel<<<blocks, threadCount>>>(d_out, d_flameFrame, d_fullFrame, d_alphas);
-	cudaDeviceSynchronize();
 	d_out.download(frame);
 	//Free frame pointers device memory	
 	cudaFree(d_outPtr);
@@ -342,7 +338,6 @@ Particle *updateParticles(Particle *container, int matchTip[2]) {
 	cudaMemcpy(d_matchTip, matchTip, sizeof(int) * 2, cudaMemcpyHostToDevice);
 	particleKernel<<<blocks, threadCount>>>(d_container, d_matchTip, d_randStates);
 	
-	cudaDeviceSynchronize;
 	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
 	cudaFree(d_container);
 	cudaFree(d_matchTip);
@@ -364,7 +359,6 @@ Particle *initialSetValues(Particle *container) {
 	//allocate device memory for the particle container
 	cudaMalloc((void**)&d_container, sizeof(Particle) * MaxParticles);
 	initialParticleKernel << <blocks, threadCount >> > (d_container);
-	cudaDeviceSynchronize;
 	//copy device memory for the particle container back to host memory
 	cudaMemcpy(container, d_container, sizeof(Particle) * MaxParticles, cudaMemcpyDeviceToHost);
 	cudaFree(d_container);

@@ -35,10 +35,10 @@ int main(int argc, char** argv) {
 	int *trackingLocation = (int*)malloc(sizeof(int) * 2);
 	*particleContainer = *initialSetValues(particleContainer);
 	namedWindow("Match Tracker", 1);
+	Mat frame;
 	//infinite loop capturing frames
 	for (;;)
 	{
-		Mat frame;
 		cap >> frame; // get a new frame from camera		
 		track(frame, trackingLocation);
 		//Sort the particle list
