@@ -5,6 +5,13 @@
 #include "matchTracker.h"
 #include "Particle.h"
 
+/*
+Cuda kernel for eroding the edges of the flame
+out - output GpuMat image
+flameFrame - frame of just the dilated fire on a black background
+fullFrame - GpuMat image taken from the webcam
+alphas - all of the alpha values for each pixel, used for alpha transparency of the flame
+*/
 __global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameFrame, cv::cuda::GpuMat fullFrame, int *alphas)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -48,6 +55,13 @@ __global__ void genericErodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat flameF
 	}
 }
 
+
+/*
+Cuda kernel for expanding the flame from a set of single pixel particles to an interpolated dilation, as a result of initial dilation
+out - output GpuMat image of the flame on a black background, it is input as a black frame
+particleCount - the colours of particles that are used for each given pixel, as a result of the dilation. This includes alpha and rgb values.
+alphas - the alpha values of each flame pixel, used as an output calculated from the particleCount values
+*/
 __global__ void applyDilation(cv::cuda::GpuMat out, int *particleCount, int *alphas) {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < X * Y)
