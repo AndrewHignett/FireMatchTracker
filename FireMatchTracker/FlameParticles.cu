@@ -89,7 +89,10 @@ __global__ void applyDilation(cv::cuda::GpuMat out, int *particleCount, int *alp
 }
 
 /*
-flameFrame must start as a black frame
+Set up dilation of the single pixel particles of the flame, by generating descriptions of pixels based off the surrounding particles
+flameFrame - frame of displayed flame particles on a black background
+particle count - the colours of the particles that are used for each given pixel, in rgba, as a result of the dilation in this function. Used as an output.
+alphas - the alphas values of each flame particle, accessed to get the new alpha value of new flame pixels
 */
 __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCount, int *alphas)
 {
@@ -124,6 +127,13 @@ __global__ void genericDilateKernel(cv::cuda::GpuMat flameFrame, int *particleCo
 	}
 }
 
+/*
+Initialise the class variables for the Particle object
+pos - the position of the particle as a float array of x, y and z values
+vel - the velocity of the particle as a float array of x, y and z values, acting asa 3D direction vector
+colour - the colour of the particle in rgba values from 0-255
+lifeI - the initial life of the particle, used for testing whether the particle should be visible or not and applying colour changing
+*/
 __host__ __device__
 void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], float lifeI) {
 	position[0] = pos[0];
