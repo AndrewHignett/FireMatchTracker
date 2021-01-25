@@ -152,6 +152,12 @@ void Particle::setValues(float pos[3], float vel[3], unsigned char colour[4], fl
 	life = lifeI;
 }
 
+/*
+For each particle that should be visible in the flame, add colours to frame's pixels and store alpha
+frame - An initially black frame used as the output. This frame output will contain the initial particle flame pixels.
+container - A list of all potential particles to be displayed
+alphas - An output to store the alpha transparency of each of the particles
+*/
 __global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container, int *alphas) {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < MaxParticles)
@@ -171,6 +177,12 @@ __global__ void flameKernel(cv::cuda::GpuMat frame, Particle *container, int *al
 	}
 }
 
+/*
+The general function call to add a flame to a given frame
+frame - The output frame with the fire particles added to the initial frame captured from the webcam
+fullFrame - The initial frame captured from the webcam
+container - A list of all potential particles to be displayed
+*/
 void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	int threadCount = 1024;
 	int blocks = (MaxParticles - 1) / threadCount + 1;
@@ -264,6 +276,12 @@ void addFlame(Mat frame, Mat fullFrame, Particle *container) {
 	free(alphas);
 }
 
+/*
+Determine new particle position, colour and age
+container - A list of all potential particles to be displayed
+matchTip - The 2D pixel location of the tip of the match from which the pixels would be emitted
+states - A cuda random state that allows randomness inside this cuda kernel, and is applied to generate random velocity and start position adders
+*/
 __global__ void particleKernel(Particle *container, int *matchTip, curandState_t *states){
 
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -315,11 +333,16 @@ __global__ void particleKernel(Particle *container, int *matchTip, curandState_t
 	}
 }
 
+/*
+Intitialise the values of the class variables to specific hard coded values
+container - A list of all potential particles to be displayed
+*/
 __global__ void initialParticleKernel(Particle *container) {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < MaxParticles)
 	{
 		float pos[3] = { 0.0, 0.0, 0.0 };
+		//negative velocity means the particles will go up the screen
 		float vel[3] = { 0.0, -300.0, 0.0 };
 		unsigned char colour[4] = { 255, 255, 0, 255 };
 		float life = 0;
@@ -327,20 +350,14 @@ __global__ void initialParticleKernel(Particle *container) {
 	}
 }
 
-//update the particle postions and return the new positions, before adding the flame to the frame
-//the particles are already sorted by their life, low to high
+/*
+Update the particle postions and return the new positions, before adding the flame to the frame. The particles are already sorted by their life, low to high.
+container - A list of all potential particles to be displayed
+matchTip - The 2D pixel location of the tip of the match from which the pixels would be emitted
+*/
 Particle *updateParticles(Particle *container, int matchTip[2]) {
 	//add a new number of particles based on the emmissions per frame
 	//max out at maxParticles
-	//it's possible for particles to be removed, as they time out
-	//we need a way to check if a particle is in use quickly so that particles can be overwritten
-	//with new particles. The particle's age can act as this.
-	//We can update a given number of known particles, so that they can be made visible
-	//The particles would need to be sorted by age, or at the very least, guarenteed that the first
-	//"emmisions per frame" particles are innactive
-	//Alternatively, we could add another variable to the Particle class, a Boolean "Active", to indicate
-	//whether the particle is active or not. This adds a little memory useage, but makes the sorting much
-	//easier
 
 	//reduced threadCount to fix the "Too many resources requested for launch" error
 	int threadCount = 256;
@@ -370,6 +387,10 @@ Particle *updateParticles(Particle *container, int matchTip[2]) {
 	return container;
 }
 
+/*
+Initialise all particles as a set of initial values
+container - A list of all potential particles to be displayed
+*/
 Particle *initialSetValues(Particle *container) {
 	//pos, vel, colour, size, angle, weight, life
 	//call a cuda kernel and initialise each of the particles simultaneously
