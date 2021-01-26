@@ -1,22 +1,22 @@
 #pragma once
 #include <opencv2/core.hpp>
+#include <opencv2/cudafilters.hpp>
+#include <device_launch_parameters.h>
+#include <cuda_runtime.h>
+using namespace cv::cuda;
 using namespace cv;
-#include <glew.h>
-#include <glfw3.h>
-#include <glm.hpp>
-#include <vec2.hpp>
-#include <vec3.hpp>
-#include <vec4.hpp>
-#include <mat4x4.hpp>
-#include <gtc\matrix_transform.hpp>
-#include <gtc\type_ptr.hpp>
 #include <algorithm>
 
 #ifndef _matchTracker_
 #define _matchTracker_
+/*
+Define function template for the track function, for tracking the match tip
+*/
 void track(Mat frame, int *tip);
-Mat averageFrame(Mat buffer[3]);
 
-#define WINDOW_WIDTH 1280
-#define WINDOW_HEIGHT 720
+/*
+Declared dimensions of the window captured through the webcam
+*/
+const int X = 1280;
+const int Y = 720;
 #endif
