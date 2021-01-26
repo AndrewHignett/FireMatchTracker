@@ -15,6 +15,11 @@ bool operator<(Particle& x, Particle& y)
 	return x.getLife() < y.getLife();
 }
 
+/*
+Main function for match tracking. Access the webcam and display the image in real time. Pass the frame into the
+tracker, and find a tracking location, then emit particles from the tracking location and display the final
+frame.
+*/
 int main(int argc, char** argv) {
 	 //test code from Get started with OpenCV CUDA cpp
 	printShortCudaDeviceInfo(getDevice());

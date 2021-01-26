@@ -2,11 +2,13 @@
 #include <set>
 using namespace cv::cuda;
 
-//store the length of trackingLocations in shared memory, then sync threads and store it in trackingLocations[0];
-//could try putting the set in here instead of needing to loop through the frame after, this would also mean the tracked frame is not neededs
+/*
+Detect the centre of red objects and mark these as pixels on a black frame
+trackedFrame - A black frame with single red pixels representing the centre of red detected objects
+cleanFrame - A frame of red and black, where red represents particularly red parts of the image
+*/
 __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuMat cleanFrame)
 {
-	//detect object size here
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if ((threadId < X * Y) && ((threadId/X)%10 == 0) && ((threadId % X) % 10 == 0))
 	{
@@ -18,8 +20,8 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 			int maxY = row;
 			int minX = column;
 			int minY = row;
-			//Current array size is unstable, only works up until half the pixels being red (displayed as green), but saves memory and it's expected there's effort 
-			//to be as few red pixels as possible
+			//Current array size is unstable, only works up until half the pixels being red (displayed as green), but saves memory and
+			//it's expected there's effort to be as few red pixels as possible
 			int pixelList[(X * Y) / 200];
 			bool pixelUsed[X / 10][Y / 10] = { 0 };
 			pixelList[0] = X * row + column;
@@ -84,6 +86,11 @@ __global__ void detectObjectKernel(cv::cuda::GpuMat trackedFrame, cv::cuda::GpuM
 	}
 }
 
+/*
+Erode the red image to restore closer to original object sizes
+out - output of the eroded frame, red objects on a black background
+dilatedFrame - input of an already dilated frame, red objects on a black background
+*/
 __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -119,6 +126,11 @@ __global__ void erodeKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat dilatedFrame)
 	}
 }
 
+/*
+Dilate the red object on black background frame, to fill gaps inside the objects, if any are present
+out - out of the dilated frame, in the form of red objects on a black background
+redFrame - a frame with all of the detected red areas of the image highlighted, on a black background
+*/
 __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -147,14 +159,12 @@ __global__ void dilateKernel(cv::cuda::GpuMat out, cv::cuda::GpuMat redFrame)
 	}
 }
 
+/*
+Identify the areas of an image that are particularly red, so that the markers on the match can be detected
+out - output, a frame with all of the areas that pass a "redness" threshold as red and the rest as black
+*/
 __global__ void getRedKernel(cv::cuda::GpuMat out)
 {
-	//detect end
-	//determine orientation
-	//determine distance
-	//have internal representation of it's position in 3D
-	//draw particles in 3D space
-	//move particles with physics based on the match's movement
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
 	if (threadId < X * Y)
 	{
@@ -179,6 +189,10 @@ __global__ void getRedKernel(cv::cuda::GpuMat out)
 	}
 }
 
+/*
+Create a black mat image
+out - an entirely black frame
+*/
 __global__ void blackKernel(cv::cuda::GpuMat out)
 {
 	int threadId = blockIdx.x * blockDim.x + threadIdx.x;
@@ -192,7 +206,13 @@ __global__ void blackKernel(cv::cuda::GpuMat out)
 	}
 }
 
-
+/*
+Identify where the match tip is in the image, based on the tracking dot centres of red areas and their relationship with each
+other. The expectation is that there must be three tracking locations in a straight line, where the ratio between 2 locations
+compared to another 1 with a shared location is approximately 1.5.
+trackingLocations - The locations of the red tracking dots in the frame, that represent the center of red areas
+matchTip - The output, an x-y coordinate for the determined match tip in the frame
+*/
 void getMatchLocation(std::set<int> *trackingLocations, int *matchTip){
 	matchTip[0] = -1;
 	matchTip[1] = -1;
@@ -227,7 +247,7 @@ void getMatchLocation(std::set<int> *trackingLocations, int *matchTip){
 						dotProduct = (a[0] * b[0] + a[1] * b[1]) / (aMagnitude * bMagnitude);	
 						if (dotProduct > 0.99) {
 							ratio = bMagnitude / aMagnitude;
-							//test if ratio is close to 1.5
+							//test if ratio is close to 1.5, as this is approximately the expected ratio
 							if ((1.35 < ratio) && (ratio < 1.65) && (abs(1.6 - ratio) < abs(1.6 - oldRatio))){
 								memcpy(matchTip, trackC, sizeof(int)*2);
 								matchTip[0] += b[0] / 10;
@@ -242,6 +262,12 @@ void getMatchLocation(std::set<int> *trackingLocations, int *matchTip){
 	}
 }
 
+/*
+The main function for tracking the tip of the match. Take an input frame from the webcam and find the location where flame particles
+should be emitted from, as an x-y coordinate of the match tip.
+frame - The frame taken from the webcam
+tip - The pointer to the memory location to store the tip coordinates
+*/
 void track(Mat frame, int *tip) {
 	int threadCount = 1024;
 	int blocks = (X * Y - 1) / threadCount + 1;
